@@ -1,0 +1,21 @@
+name: Pull request
+
+# A pull request's title says what kind of change it is, so the release
+# notes can list it under the right heading: feat: ..., fix: ..., docs: ...,
+# chore: ..., and the rest in .github/release-drafter.yml, with a ! for a
+# breaking change (feat!: ...). The skip-changelog label leaves one out of
+# the notes, and skips this check.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: Title
+    runs-on: ubuntu-latest
+    steps:
+      - uses: release-drafter/release-drafter/check-pr@72967cdc98ddd3160f1fc3dff619de365e137dd0 # v7.9.0

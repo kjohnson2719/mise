@@ -1,0 +1,30 @@
+name: Release Drafter
+
+# Keeps the next release's draft up to date as pull requests merge into
+# main, from .github/release-drafter.yml. Release publishes it.
+#
+# Each run writes the draft's notes afresh, so write the highlights just
+# before running Release; Release keeps the notes as they were when it
+# started.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-drafter
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    name: Draft the next release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+    steps:
+      - uses: release-drafter/release-drafter@72967cdc98ddd3160f1fc3dff619de365e137dd0 # v7.9.0

@@ -3,8 +3,12 @@ name: Release
 # A release of Merran (docs/operations.md, "Releases and updates"), run by
 # hand from main with its version: every check, then the Docker image for
 # amd64 and arm64, signed, with its SBOM and provenance; the browser
-# extension's zips; and the GitHub release, tagged v<version>, with notes
-# from the commits since the last one.
+# extension's zips; and the GitHub release, tagged v<version>.
+#
+# The release is the draft Release Drafter keeps (release-drafter.yml), with
+# the highlights written in it, published last, once the images exist: every
+# Merran's update check sees it the moment it's published. Without a draft,
+# GitHub writes notes from the pull requests.
 #
 # Image tags: the version itself (0.1.0-alpha.1, 0.4.2), which never moves,
 # and `next`, the newest release of any kind. A release that isn't a
@@ -27,12 +31,17 @@ concurrency:
 
 jobs:
   version:
-    name: The version
+    name: The version and notes
     runs-on: ubuntu-latest
+    permissions:
+      # Only a token that can write releases sees drafts. This job only
+      # reads the draft.
+      contents: write
     outputs:
       version: ${{ steps.version.outputs.version }}
       prerelease: ${{ steps.version.outputs.prerelease }}
       stable-major: ${{ steps.version.outputs.stable-major }}
+      draft: ${{ steps.notes.outputs.draft }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -66,6 +75,34 @@ jobs:
           else
             echo "stable-major=false" >> "$GITHUB_OUTPUT"
           fi
+      # The draft's notes, taken now, before anything's built: a merge
+      # during the build writes the draft afresh, without the highlights.
+      - id: notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          draft=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '[.[] | select(.draft)] | sort_by(.created_at) | last | .id // empty')
+          mkdir -p notes
+          echo > notes/draft.md
+          if [ -n "$draft" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/releases/$draft" --jq '.body // ""' > notes/draft.md
+            if grep -qF "Write the highlights here" notes/draft.md; then
+              echo "::error::The draft release still says \"Write the highlights here\". Write them, or delete that section, then run Release again."
+              exit 1
+            fi
+            # The first release's draft, with no earlier release to compare.
+            if grep -qF "could not find a previous" notes/draft.md; then
+              echo "::error::The draft release still has Release Drafter's warning about a previous release. Write its notes, delete the warning, then run Release again."
+              exit 1
+            fi
+          fi
+          echo "draft=$draft" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: notes
+          path: notes/draft.md
 
   check:
     needs: version
@@ -159,18 +196,23 @@ jobs:
     env:
       VERSION: ${{ needs.version.outputs.version }}
       PRERELEASE: ${{ needs.version.outputs.prerelease }}
+      DRAFT: ${{ needs.version.outputs.draft }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: extension
           path: extension
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: notes
+          path: notes
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          cat > notes.md <<EOF
+          cat > getting.md <<EOF
           ## Getting it
 
           \`\`\`bash
@@ -181,11 +223,37 @@ jobs:
 
           The image is signed: \`cosign verify ghcr.io/${GITHUB_REPOSITORY}:${VERSION} --certificate-identity-regexp 'https://github.com/${GITHUB_REPOSITORY}/' --certificate-oidc-issuer https://token.actions.githubusercontent.com\`
           EOF
-          flags=()
-          if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
-          gh release create "v$VERSION" extension/*.zip \
-            --target "$GITHUB_SHA" \
-            --title "Merran $VERSION" \
-            --notes-file notes.md \
-            --generate-notes \
-            "${flags[@]}"
+          if [ -z "$DRAFT" ]; then
+            flags=()
+            if [ "$PRERELEASE" = "true" ]; then flags+=(--prerelease); fi
+            gh release create "v$VERSION" extension/*.zip \
+              --target "$GITHUB_SHA" \
+              --title "Merran $VERSION" \
+              --notes-file getting.md \
+              --generate-notes \
+              "${flags[@]}"
+            exit 0
+          fi
+          # The draft's notes, then how to get it, then everything since the
+          # last release.
+          previous=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq '[.[] | select(.draft | not)] | sort_by(.published_at) | last | .tag_name // empty')
+          {
+            cat notes/draft.md
+            printf '\n\n'
+            cat getting.md
+            if [ -n "$previous" ]; then
+              printf '\n**Full changelog:** https://github.com/%s/compare/%s...v%s\n' \
+                "$GITHUB_REPOSITORY" "$previous" "$VERSION"
+            fi
+          } > notes.md
+          # The draft becomes this release, still a draft while the zips go
+          # on, then it's published, which tags this commit.
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$DRAFT" \
+            -f tag_name="v$VERSION" \
+            -f target_commitish="$GITHUB_SHA" \
+            -f name="Merran $VERSION" \
+            -F body=@notes.md \
+            -F prerelease="$PRERELEASE" > /dev/null
+          gh release upload "v$VERSION" extension/*.zip --clobber
+          gh api -X PATCH "repos/$GITHUB_REPOSITORY/releases/$DRAFT" -F draft=false > /dev/null
