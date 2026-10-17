@@ -180,8 +180,13 @@ function CardContent({
           )}
           {onSale && onSale.length > 0 && <OnSaleBadge sales={onSale} />}
           {recipe.tags.map((tag) => (
-            <Badge key={tag} variant="secondary">
-              {tag}
+            <Badge
+              key={tag}
+              variant="secondary"
+              title={tag}
+              className="max-w-full"
+            >
+              <span className="truncate">{tag}</span>
             </Badge>
           ))}
         </div>
