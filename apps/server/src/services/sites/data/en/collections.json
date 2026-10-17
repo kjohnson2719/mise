@@ -1,0 +1,551 @@
+[
+  {
+    "id": "weeknight",
+    "title": "Weeknight wins",
+    "description": "Dinners on the table in 40 minutes or less.",
+    "theme": "Weeknight dinners on the table in 40 minutes or less",
+    "rule": {
+      "courses": ["main"],
+      "maxMinutes": 40
+    },
+    "classics": [
+      {
+        "url": "https://www.recipetineats.com/honey-garlic-chicken/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/taiwanese-three-cup-chicken/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/chicken-stir-fry-chop-suey/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/chicken-fried-rice/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/thai-red-curry-with-chicken/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/french-chicken-au-poivre-sauce/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/beef-stroganoff/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://cooking.nytimes.com/recipes/12965-spaghetti-carbonara",
+        "site": "NYT Cooking"
+      },
+      {
+        "url": "https://pinchofyum.com/peanut-chicken-with-ginger-slaw",
+        "site": "Pinch of Yum"
+      },
+      {
+        "url": "https://www.recipetineats.com/coconut-chicken-curry-quick-easy/",
+        "site": "RecipeTin Eats"
+      }
+    ]
+  },
+  {
+    "id": "chicken",
+    "title": "Chicken, every way",
+    "description": "Curries, roasts, crispy and saucy: the chicken dinners people keep coming back to.",
+    "theme": "Chicken dinners, every way",
+    "rule": {
+      "words": ["chicken"]
+    },
+    "classics": [
+      {
+        "url": "https://www.recipetineats.com/butter-chicken/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/chicken-tikka-masala/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/orange-chicken/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/poulet-roti-french-roast-chicken/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/one-pan-portuguese-chicken-and-potato-bake/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://pinchofyum.com/chicken-with-cajun-cream-sauce",
+        "site": "Pinch of Yum"
+      },
+      {
+        "url": "https://pinchofyum.com/crispy-parmesan-chicken-with-creamy-lemon-pasta",
+        "site": "Pinch of Yum"
+      },
+      {
+        "url": "https://www.bonappetit.com/recipe/bas-best-chicken-parm",
+        "site": "Bon Appétit"
+      },
+      {
+        "url": "https://www.bbcgoodfood.com/recipes/easy-chicken-curry",
+        "site": "BBC Good Food"
+      },
+      {
+        "url": "https://www.recipetineats.com/tuscan-chicken-stew/",
+        "site": "RecipeTin Eats"
+      }
+    ]
+  },
+  {
+    "id": "pasta",
+    "title": "Pasta & noodles",
+    "description": "Sauces worth the simmer, and quick noodle bowls.",
+    "theme": "Pasta and noodle dishes",
+    "rule": {
+      "words": [
+        "pasta",
+        "spaghetti",
+        "linguine",
+        "fettuccine",
+        "penne",
+        "rigatoni",
+        "orzo",
+        "lasagna",
+        "lasagne",
+        "gnocchi",
+        "tagliatelle",
+        "pappardelle",
+        "macaroni",
+        "noodle",
+        "ramen",
+        "udon",
+        "lo mein",
+        "pad thai"
+      ],
+      "without": ["salad"]
+    },
+    "classics": [
+      {
+        "url": "https://www.recipetineats.com/spaghetti-bolognese/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://cooking.nytimes.com/recipes/1020830-caramelized-shallot-pasta",
+        "site": "NYT Cooking"
+      },
+      {
+        "url": "https://cooking.nytimes.com/recipes/1015178-marcella-hazans-tomato-sauce",
+        "site": "NYT Cooking"
+      },
+      {
+        "url": "https://www.recipetineats.com/mushroom-ragu-pasta-recipe/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.loveandlemons.com/french-onion-pasta/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.loveandlemons.com/butternut-squash-gnocchi/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.recipetineats.com/one-pan-mongolian-beef-noodles-with-broccoli/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/beef-rice-noodles/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://cooking.nytimes.com/recipes/12965-spaghetti-carbonara",
+        "site": "NYT Cooking"
+      }
+    ]
+  },
+  {
+    "id": "soups",
+    "title": "Soups & stews",
+    "description": "Big pots for cold nights, most of them better the next day.",
+    "theme": "Soups and stews for cold nights",
+    "rule": {
+      "courses": ["soup"],
+      "words": [
+        "soup",
+        "stew",
+        "chowder",
+        "chili",
+        "bisque",
+        "gumbo",
+        "minestrone",
+        "pho",
+        "ramen",
+        "dal"
+      ]
+    },
+    "classics": [
+      {
+        "url": "https://www.recipetineats.com/french-onion-soup/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://pinchofyum.com/pastina-soup-italian-penicillin",
+        "site": "Pinch of Yum"
+      },
+      {
+        "url": "https://www.bbcgoodfood.com/recipes/carrot-coriander-soup",
+        "site": "BBC Good Food"
+      },
+      {
+        "url": "https://www.loveandlemons.com/vegetable-soup/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.loveandlemons.com/lentil-soup/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.loveandlemons.com/black-bean-soup-recipe/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.loveandlemons.com/minestrone-soup/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.loveandlemons.com/vegetarian-chili-recipe/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://pinchofyum.com/the-best-detox-crockpot-lentil-soup",
+        "site": "Pinch of Yum"
+      }
+    ]
+  },
+  {
+    "id": "vegetarian",
+    "title": "Vegetarian mains",
+    "description": "Meatless dinners that don't feel like they're missing anything.",
+    "theme": "Vegetarian mains worth making again",
+    "rule": {
+      "courses": ["main", "soup", "salad"],
+      "diets": ["vegetarian"]
+    },
+    "classics": [
+      {
+        "url": "https://www.loveandlemons.com/chickpea-curry/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.loveandlemons.com/stuffed-peppers-recipe/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.loveandlemons.com/best-veggie-burger-recipe/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.bbcgoodfood.com/recipes/vegan-chilli",
+        "site": "BBC Good Food"
+      },
+      {
+        "url": "https://minimalistbaker.com/easy-vegan-fried-rice/",
+        "site": "Minimalist Baker"
+      },
+      {
+        "url": "https://www.bbcgoodfood.com/recipes/shakshuka",
+        "site": "BBC Good Food"
+      },
+      {
+        "url": "https://www.loveandlemons.com/falafel/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.loveandlemons.com/hummus-recipe/",
+        "site": "Love and Lemons"
+      }
+    ]
+  },
+  {
+    "id": "comfort",
+    "title": "Comfort classics",
+    "description": "Weekend projects and family favorites.",
+    "theme": "Comfort food classics and weekend projects",
+    "rule": {
+      "words": [
+        "comfort food",
+        "casserole",
+        "pot pie",
+        "mac and cheese",
+        "meatloaf",
+        "shepherd's pie",
+        "cottage pie",
+        "pot roast",
+        "lasagna",
+        "braised",
+        "meatballs",
+        "enchiladas"
+      ]
+    },
+    "classics": [
+      {
+        "url": "https://www.recipetineats.com/lasagna/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/shepherds-pie/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/chicken-pot-pie/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.recipetineats.com/birria-tacos/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.bbcgoodfood.com/recipes/chilli-con-carne-recipe",
+        "site": "BBC Good Food"
+      },
+      {
+        "url": "https://www.bbcgoodfood.com/recipes/chicken-tikka-masala",
+        "site": "BBC Good Food"
+      },
+      {
+        "url": "https://www.recipetineats.com/beef-stroganoff/",
+        "site": "RecipeTin Eats"
+      }
+    ]
+  },
+  {
+    "id": "baking",
+    "title": "Bake it",
+    "description": "Bread, cakes and muffins from bakers who test everything.",
+    "theme": "Bread, cakes and muffins",
+    "rule": {
+      "courses": ["baking"],
+      "words": [
+        "bread",
+        "loaf",
+        "cake",
+        "muffin",
+        "scone",
+        "focaccia",
+        "brioche",
+        "rolls",
+        "buns",
+        "biscuits",
+        "tart"
+      ],
+      "without": ["breadcrumbs", "crab cakes", "fish cakes", "pancake"]
+    },
+    "classics": [
+      {
+        "url": "https://www.kingarthurbaking.com/recipes/classic-sandwich-bread-recipe",
+        "site": "King Arthur Baking"
+      },
+      {
+        "url": "https://www.kingarthurbaking.com/recipes/no-knead-crusty-white-bread-recipe",
+        "site": "King Arthur Baking"
+      },
+      {
+        "url": "https://sallysbakingaddiction.com/homemade-pizza-crust-recipe/",
+        "site": "Sally's Baking Addiction"
+      },
+      {
+        "url": "https://www.recipetineats.com/banana-bread-recipe/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.loveandlemons.com/apple-bread-recipe/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://sallysbakingaddiction.com/blueberry-muffins/",
+        "site": "Sally's Baking Addiction"
+      },
+      {
+        "url": "https://www.kingarthurbaking.com/recipes/fudge-brownies-recipe",
+        "site": "King Arthur Baking"
+      },
+      {
+        "url": "https://www.recipetineats.com/chocolate-cake/",
+        "site": "RecipeTin Eats"
+      },
+      {
+        "url": "https://www.kingarthurbaking.com/recipes/classic-birthday-cake-recipe",
+        "site": "King Arthur Baking"
+      },
+      {
+        "url": "https://sallysbakingaddiction.com/apple-pie-recipe/",
+        "site": "Sally's Baking Addiction"
+      }
+    ]
+  },
+  {
+    "id": "cookies",
+    "title": "Cookies and bars",
+    "description": "Four famous chocolate chip cookies to bake off and pick a favorite, and the newest cookies and bars.",
+    "theme": "Cookies and bars",
+    "rule": {
+      "words": [
+        "cookie",
+        "biscotti",
+        "shortbread",
+        "snickerdoodle",
+        "brownie",
+        "blondie",
+        "bars"
+      ],
+      "without": ["cookie butter"]
+    },
+    "classics": [
+      {
+        "url": "https://cooking.nytimes.com/recipes/1015819-chocolate-chip-cookies",
+        "site": "NYT Cooking"
+      },
+      {
+        "url": "https://www.bonappetit.com/recipe/bas-best-chocolate-chip-cookies",
+        "site": "Bon Appétit"
+      },
+      {
+        "url": "https://www.kingarthurbaking.com/recipes/classic-chocolate-chip-cookies-recipe",
+        "site": "King Arthur Baking"
+      },
+      {
+        "url": "https://pinchofyum.com/the-best-soft-chocolate-chip-cookies",
+        "site": "Pinch of Yum"
+      }
+    ]
+  },
+  {
+    "id": "breakfast",
+    "title": "Weekend breakfast",
+    "description": "Slow mornings: pancakes, eggs and something baked.",
+    "theme": "Weekend breakfast and brunch",
+    "rule": {
+      "courses": ["breakfast"],
+      "words": [
+        "pancake",
+        "waffle",
+        "french toast",
+        "omelet",
+        "omelette",
+        "frittata",
+        "granola",
+        "oatmeal",
+        "porridge",
+        "shakshuka",
+        "breakfast"
+      ]
+    },
+    "classics": [
+      {
+        "url": "https://www.bbcgoodfood.com/recipes/easy-pancakes",
+        "site": "BBC Good Food"
+      },
+      {
+        "url": "https://www.loveandlemons.com/cottage-cheese-pancakes/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.bbcgoodfood.com/recipes/shakshuka",
+        "site": "BBC Good Food"
+      },
+      {
+        "url": "https://www.loveandlemons.com/turkish-eggs/",
+        "site": "Love and Lemons"
+      },
+      {
+        "url": "https://www.kingarthurbaking.com/recipes/blueberry-muffins-recipe",
+        "site": "King Arthur Baking"
+      },
+      {
+        "url": "https://www.recipetineats.com/banana-bread-recipe/",
+        "site": "RecipeTin Eats"
+      }
+    ]
+  },
+  {
+    "id": "autumn",
+    "title": "Autumn flavors",
+    "description": "Apples, pumpkin, squash and warm spice, while they're in season.",
+    "theme": "Autumn recipes with apples, pumpkin, squash and warm spices",
+    "rule": {
+      "words": [
+        "pumpkin",
+        "apple",
+        "pear",
+        "butternut",
+        "squash",
+        "sweet potato",
+        "maple",
+        "pecan",
+        "cinnamon",
+        "chai"
+      ],
+      "seasons": ["autumn"]
+    },
+    "classics": []
+  },
+  {
+    "id": "grilling",
+    "title": "Fire up the grill",
+    "description": "Burgers, skewers and charred vegetables for long evenings outside.",
+    "theme": "Summer grilling and barbecue recipes",
+    "rule": {
+      "words": [
+        "grill",
+        "grilled",
+        "bbq",
+        "barbecue",
+        "kebab",
+        "kabob",
+        "skewers",
+        "burger"
+      ],
+      "seasons": ["summer"]
+    },
+    "classics": []
+  },
+  {
+    "id": "salads",
+    "title": "Big summer salads",
+    "description": "Salads that make a meal when it's too hot to cook.",
+    "theme": "Hearty summer salads that make a meal",
+    "rule": {
+      "courses": ["salad"],
+      "words": ["salad"],
+      "seasons": ["summer"]
+    },
+    "classics": []
+  },
+  {
+    "id": "holiday-baking",
+    "title": "Holiday baking",
+    "description": "Gingerbread, cookies for giving, and the yearly showstoppers.",
+    "theme": "Christmas and holiday baking",
+    "rule": {
+      "words": [
+        "gingerbread",
+        "christmas",
+        "holiday",
+        "peppermint",
+        "eggnog",
+        "yule",
+        "stollen",
+        "fruitcake",
+        "panettone"
+      ],
+      "months": [11, 12]
+    },
+    "classics": []
+  }
+]

@@ -1,44 +1,30 @@
-import * as React from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Clock01Icon } from "@hugeicons/core-free-icons"
 import {
-  costShown,
-  type OnSale,
-  type RecipeCost,
-  type RecipeSummary,
-} from "@mise/shared"
-import { Link } from "react-router"
+  Clock01Icon,
+  CookBookIcon,
+  UserGroupIcon,
+} from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Link } from "@tanstack/react-router"
+import { useTranslation } from "react-i18next"
 
 import { Badge } from "@/components/ui/badge"
-import { Card } from "@/components/ui/card"
 import { SelectMark } from "@/features/select/select-mark"
 import { useLongPress } from "@/features/select/use-selection"
-import { onSaleText } from "@/features/shop/sale-text"
-import { storedChoice } from "@/lib/stored-choice"
+import { formatRelativeDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
-import { formatMinutes, formatRelativeDate } from "./format"
+import { formatMinutes, formatServings } from "./format"
+import { OnSaleBadge } from "@/features/stores/on-sale-badge"
+import {
+  formatPrice,
+  useCosts,
+  type RecipeSale,
+} from "@/features/stores/queries"
+
+import type { RecipeSummary } from "./queries"
 import { RatingStars } from "./rating-stars"
-import { RecipeImage } from "./recipe-image"
 
-export type RecipeView = "grid" | "list"
-
-/** Photo cards or a compact list, remembered on this device. */
-export const useRecipeView = storedChoice<RecipeView>(
-  "mise.recipeView",
-  ["grid", "list"],
-  "grid"
-)
-
-/** "~$3.02 a serving", once most of the recipe is priced. */
-function servingCost(cost: RecipeCost | undefined) {
-  const shown = costShown(cost)
-  return shown?.perServing
-    ? `~${shown.perServing.toLocaleString(undefined, { style: "currency", currency: "USD" })}`
-    : null
-}
-
-/** A card's part in Select mode on Recipes. */
+/** How a card takes part in select mode. */
 export type CardSelect = {
   selecting: boolean
   picked: boolean
@@ -47,23 +33,24 @@ export type CardSelect = {
   onLongPress: () => void
 }
 
+const CARD =
+  "group flex h-full w-full flex-col overflow-hidden rounded-3xl border bg-card text-left text-card-foreground transition-colors outline-none hover:border-primary/40 focus-visible:ring-[3px] focus-visible:ring-ring/50"
+
 /**
- * The recipe's link, or while selecting a button that picks it. A long
- * press on a touch screen starts selecting.
+ * A recipe in the library: its photo, its name, a little about it, and its
+ * tags. A link to it, or while selecting, a button that picks it.
  */
-function Pressable({
-  slug,
-  name,
+export function RecipeCard({
+  recipe,
   select,
-  className,
-  children,
+  onSale,
 }: {
-  slug: string
-  name: string
+  recipe: RecipeSummary
   select?: CardSelect
-  className: string
-  children: React.ReactNode
+  /** What it uses that's a deal at the household's store. */
+  onSale?: readonly RecipeSale[] | undefined
 }) {
+  const { t } = useTranslation()
   const press = useLongPress(
     () => select?.onLongPress(),
     Boolean(select && !select.selecting)
@@ -73,176 +60,137 @@ function Pressable({
       <button
         type="button"
         aria-pressed={select.picked}
-        aria-label={`${select.picked ? "Unselect" : "Select"} ${name}`}
+        aria-label={
+          select.picked
+            ? t("select.unpick", { name: recipe.name })
+            : t("select.pick", { name: recipe.name })
+        }
         onClick={select.onToggle}
-        className={cn(className, "text-left")}
+        className={cn(
+          CARD,
+          select.picked && "border-primary ring-2 ring-primary"
+        )}
       >
-        {children}
+        <CardContent recipe={recipe} picked={select.picked} onSale={onSale} />
       </button>
     )
   }
   return (
-    <Link to={`/recipes/${slug}`} className={className} {...press}>
-      {children}
+    <Link
+      to="/recipes/$slug"
+      params={{ slug: recipe.slug }}
+      className={CARD}
+      {...press}
+    >
+      <CardContent recipe={recipe} onSale={onSale} />
     </Link>
   )
 }
 
-export function RecipeCard({
+function CardContent({
   recipe,
+  picked,
   onSale,
-  cost,
-  select,
 }: {
   recipe: RecipeSummary
-  /** What it uses that's on sale at the household's Fry's. */
-  onSale?: OnSale[]
-  cost?: RecipeCost
-  select?: CardSelect
+  /** Picked or not, while selecting. */
+  picked?: boolean
+  onSale?: readonly RecipeSale[] | undefined
 }) {
-  const time = formatMinutes(recipe.totalMinutes)
-  const perServing = servingCost(cost)
-
+  const { t, i18n } = useTranslation()
+  const costs = useCosts()
+  const cost = costs.recipes.get(recipe.id)
+  const perServing =
+    cost?.perServing != null
+      ? t("recipes.perServing", {
+          price: formatPrice(cost.perServing, costs.currency, i18n.language),
+        })
+      : null
   return (
-    <Pressable
-      slug={recipe.slug}
-      name={recipe.name}
-      select={select}
-      className="group rounded-3xl outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-    >
-      <Card
-        className={cn(
-          "relative h-full gap-0 overflow-hidden py-0 transition-shadow group-hover:shadow-md",
-          select?.picked && "ring-2 ring-primary"
+    <>
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-muted">
+        {picked !== undefined && (
+          <SelectMark picked={picked} className="absolute top-3 left-3 z-10" />
         )}
-      >
-        {select?.selecting && (
-          <SelectMark
-            picked={select.picked}
-            className="absolute top-3 left-3 z-10"
+        {recipe.photo ? (
+          <img
+            src={recipe.photo.card}
+            alt=""
+            loading="lazy"
+            className="size-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           />
-        )}
-        <RecipeImage
-          src={recipe.thumbnailUrl}
-          alt={recipe.name}
-          className="aspect-[4/3] w-full"
-        />
-        <div className="flex flex-1 flex-col gap-2 p-3 sm:p-4">
-          <h3 className="font-heading text-base leading-snug font-semibold sm:text-lg">
-            {recipe.name}
-          </h3>
-          {(time || recipe.rating || perServing) && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-              {time && (
-                <span className="flex items-center gap-1">
-                  <HugeiconsIcon
-                    icon={Clock01Icon}
-                    strokeWidth={2}
-                    className="size-4"
-                  />
-                  {time}
-                </span>
-              )}
-              <RatingStars value={recipe.rating} />
-              {perServing && (
-                <span title="About this much a serving, at your store's prices">
-                  {perServing}/serving
-                </span>
-              )}
-            </div>
-          )}
-          {onSale?.length ? (
-            <p className="line-clamp-2 text-sm font-medium text-primary">
-              {onSaleText(onSale)}
-            </p>
-          ) : null}
-          <div className="mt-auto flex flex-wrap gap-1.5 pt-1">
-            {recipe.lastMadeAt ? (
-              <Badge className="bg-accent text-accent-foreground">
-                Made {formatRelativeDate(recipe.lastMadeAt)}
-              </Badge>
-            ) : (
-              <Badge title="Not cooked yet">New</Badge>
-            )}
-            {recipe.tags.slice(0, 2).map((tag) => (
-              <Badge key={tag} variant="secondary" className="max-sm:hidden">
-                {tag}
-              </Badge>
-            ))}
-            {recipe.tags.length > 2 && (
-              <Badge variant="outline" className="max-sm:hidden">
-                +{recipe.tags.length - 2}
-              </Badge>
-            )}
+        ) : (
+          <div className="flex size-full items-center justify-center text-muted-foreground/40">
+            <HugeiconsIcon
+              icon={CookBookIcon}
+              strokeWidth={1.5}
+              className="size-12"
+            />
           </div>
+        )}
+      </div>
+      <div className="flex flex-1 flex-col gap-2.5 p-4">
+        <div className="space-y-1.5">
+          <h2 className="font-heading text-base leading-snug font-semibold group-hover:text-primary">
+            {recipe.name}
+          </h2>
+          {recipe.description && (
+            <p className="line-clamp-2 text-sm text-muted-foreground">
+              {recipe.description}
+            </p>
+          )}
         </div>
-      </Card>
-    </Pressable>
-  )
-}
-
-/** A compact row, for scanning a big library. */
-export function RecipeRow({
-  recipe,
-  onSale,
-  cost,
-  select,
-}: {
-  recipe: RecipeSummary
-  onSale?: OnSale[]
-  cost?: RecipeCost
-  select?: CardSelect
-}) {
-  const time = formatMinutes(recipe.totalMinutes)
-  const perServing = servingCost(cost)
-  return (
-    <Pressable
-      slug={recipe.slug}
-      name={recipe.name}
-      select={select}
-      className={cn(
-        "flex w-full items-center gap-3 rounded-2xl p-2 outline-none hover:bg-secondary/60 focus-visible:ring-[3px] focus-visible:ring-ring/50",
-        select?.picked && "bg-accent/60 hover:bg-accent/60"
-      )}
-    >
-      {select?.selecting && (
-        <SelectMark picked={select.picked} className="shrink-0" />
-      )}
-      <RecipeImage
-        src={recipe.thumbnailUrl}
-        alt=""
-        className="size-14 shrink-0 rounded-xl [&_svg]:size-6"
-      />
-      <div className="grid min-w-0 flex-1 gap-0.5">
-        <p className="truncate font-medium">{recipe.name}</p>
-        {onSale?.length ? (
-          <p className="truncate text-sm font-medium text-primary">
-            {onSaleText(onSale)}
-          </p>
-        ) : null}
-        <div className="flex min-w-0 items-center gap-3 text-sm text-muted-foreground">
-          {time && (
-            <span className="flex shrink-0 items-center gap-1">
+        <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+          {recipe.totalMinutes !== null && (
+            <span className="inline-flex items-center gap-1.5">
               <HugeiconsIcon
                 icon={Clock01Icon}
                 strokeWidth={2}
-                className="size-3.5"
+                className="size-4"
               />
-              {time}
+              {formatMinutes(t, recipe.totalMinutes)}
             </span>
           )}
-          <RatingStars value={recipe.rating} />
-          {perServing && <span className="shrink-0">{perServing}/serving</span>}
-          <span className="shrink-0 font-medium text-primary">
-            {recipe.lastMadeAt
-              ? `Made ${formatRelativeDate(recipe.lastMadeAt)}`
-              : "New"}
-          </span>
-          {recipe.tags.length > 0 && (
-            <span className="truncate">{recipe.tags.join(", ")}</span>
+          {recipe.servings !== null && (
+            <span className="inline-flex items-center gap-1.5">
+              <HugeiconsIcon
+                icon={UserGroupIcon}
+                strokeWidth={2}
+                className="size-4"
+              />
+              {t("recipes.serves", {
+                count: recipe.servings,
+                servings: formatServings(recipe.servings),
+              })}
+            </span>
           )}
+          {perServing && <span>{perServing}</span>}
+          {recipe.rating !== null && <RatingStars rating={recipe.rating} />}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {/* New until it's made, then when it last was. */}
+          {recipe.lastMadeAt ? (
+            <Badge className="bg-accent text-accent-foreground">
+              {t("recipes.madeWhen", {
+                when: formatRelativeDate(recipe.lastMadeAt, i18n.language),
+              })}
+            </Badge>
+          ) : (
+            <Badge title={t("recipes.notMadeYet")}>{t("recipes.new")}</Badge>
+          )}
+          {onSale && onSale.length > 0 && <OnSaleBadge sales={onSale} />}
+          {recipe.tags.map((tag) => (
+            <Badge
+              key={tag}
+              variant="secondary"
+              title={tag}
+              className="max-w-full"
+            >
+              <span className="truncate">{tag}</span>
+            </Badge>
+          ))}
         </div>
       </div>
-    </Pressable>
+    </>
   )
 }

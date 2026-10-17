@@ -1,0 +1,248 @@
+/* Merran's sage and cream, as the web app has them (apps/web/src/index.css). */
+:root {
+  color-scheme: light dark;
+  --background: oklch(0.985 0.008 85);
+  --foreground: oklch(0.25 0.018 65);
+  --card: oklch(0.995 0.003 85);
+  --primary: oklch(0.47 0.08 152);
+  --primary-foreground: oklch(0.985 0.01 95);
+  --muted: oklch(0.955 0.012 85);
+  --muted-foreground: oklch(0.5 0.02 65);
+  --destructive: oklch(0.55 0.19 28);
+  --border: oklch(0.9 0.014 85);
+  --radius: 0.75rem;
+  font:
+    14px/1.45 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.185 0.01 75);
+    --foreground: oklch(0.94 0.012 85);
+    --card: oklch(0.225 0.012 75);
+    --primary: oklch(0.75 0.1 150);
+    --primary-foreground: oklch(0.22 0.04 155);
+    --muted: oklch(0.26 0.01 75);
+    --muted-foreground: oklch(0.72 0.016 80);
+    --destructive: oklch(0.68 0.17 28);
+    --border: oklch(1 0 0 / 10%);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.popup {
+  width: 340px;
+  padding: 16px;
+}
+
+/* A page of the extension's own, in a tab. */
+.page {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 48px 16px;
+}
+
+.panel {
+  min-height: 100vh;
+  padding: 16px;
+  /* As tall as the window, but its rows sit at the top, not spread out. */
+  align-content: start;
+}
+
+.stack {
+  display: grid;
+  gap: 12px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.between {
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand img {
+  width: 24px;
+  height: 24px;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-family: ui-serif, Georgia, serif;
+  font-weight: 600;
+}
+
+h1 {
+  font-size: 18px;
+}
+
+h2 {
+  font-size: 15px;
+}
+
+p {
+  margin: 0;
+}
+
+.muted {
+  color: var(--muted-foreground);
+}
+
+.small {
+  font-size: 12px;
+}
+
+.error {
+  color: var(--destructive);
+}
+
+.card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.4);
+  background: var(--card);
+}
+
+.title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+button.outline {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--foreground);
+}
+
+button.ghost {
+  min-height: 28px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+button:focus-visible,
+input:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+input[type="text"] {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+a {
+  color: var(--primary);
+}
+
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
+/* The shopping list in the side panel. */
+.aisle {
+  display: grid;
+}
+
+.aisle h3 {
+  margin: 4px 0 2px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 4px;
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--muted);
+}
+
+.item input {
+  margin-top: 3px;
+  accent-color: var(--primary);
+}
+
+.item.checked .name {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+
+.amount {
+  color: var(--muted-foreground);
+}
+
+select {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: inherit;
+  font: inherit;
+}

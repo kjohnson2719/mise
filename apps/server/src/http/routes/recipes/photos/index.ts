@@ -1,0 +1,11 @@
+import type { AppDeps } from "../../../../core/context.ts"
+import type { Router } from "../../../router.ts"
+import runRoutes from "./[runId]/index.ts"
+import get from "./get.ts"
+import post from "./post.ts"
+
+export default (router: Router, deps: AppDeps) => {
+  get(router, deps)
+  post(router, deps)
+  runRoutes(router, deps)
+}

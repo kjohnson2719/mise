@@ -1,10 +1,9 @@
+import { goodVoices } from "@merran/shared"
 import * as React from "react"
-import { goodVoices, type VoiceStatus } from "@mise/shared"
-import { useQuery } from "@tanstack/react-query"
 
-import { api } from "@/lib/api"
+import i18n from "@/i18n"
 
-const VOICE_KEY = "mise.cookVoice"
+const VOICE_KEY = "merran-cook-voice"
 const listeners = new Set<() => void>()
 
 /** The voice chosen on this device: a voice's id, or "auto" for the best one. */
@@ -23,14 +22,14 @@ function subscribe(listener: () => void) {
   }
 }
 
-/** The voice choice, remembered on this device. */
+/** The voice choice, kept on this device. */
 export function useVoiceChoice() {
   const choice = React.useSyncExternalStore(subscribe, readChoice, () => "auto")
   const setChoice = React.useCallback((next: string) => {
     try {
       localStorage.setItem(VOICE_KEY, next)
     } catch {
-      // Private windows can refuse; it just won't be remembered.
+      // It still changes, just isn't remembered.
     }
     for (const listener of listeners) listener()
   }, [])
@@ -52,9 +51,15 @@ export function useVoices() {
   return voices
 }
 
-/** The language steps are read in. */
+/**
+ * The language to read and listen in: Merran's, with the device's region
+ * when it's the same language ("en-GB" on a British phone).
+ */
 export function readingLanguage() {
-  return navigator.language || "en-US"
+  const app = i18n.language || "en"
+  const device = navigator.language || ""
+  const base = (language: string) => language.toLowerCase().split(/[-_]/)[0]
+  return base(device) === base(app) ? device : app
 }
 
 /** The voice to read with right now: the one chosen, else the best there is. */
@@ -69,26 +74,13 @@ export function chosenVoice(
   return picked ?? goodVoices(voices, readingLanguage(), 1)[0] ?? null
 }
 
-/** A sentence in the chosen voice, to hear what it sounds like. */
+/** A sentence in a voice, to hear what it sounds like. */
 export function testVoice(choice?: string) {
   if (!("speechSynthesis" in window)) return
   window.speechSynthesis.cancel()
-  const utterance = new SpeechSynthesisUtterance(
-    "Preheat the oven to 425 degrees, and season the chicken while it heats."
-  )
+  const utterance = new SpeechSynthesisUtterance(i18n.t("cook.voice.sample"))
   const voice = chosenVoice(undefined, choice)
   if (voice) utterance.voice = voice
   utterance.lang = voice?.lang ?? readingLanguage()
   window.speechSynthesis.speak(utterance)
-}
-
-export const VOICE_KEY_QUERY = ["voice"] as const
-
-/** Whether the server reads aloud (Kokoro or OpenAI), rather than the device. */
-export function useServerVoice() {
-  return useQuery({
-    queryKey: VOICE_KEY_QUERY,
-    queryFn: async () => (await api<{ status: VoiceStatus }>("/voice")).status,
-    staleTime: 5 * 60_000,
-  })
 }

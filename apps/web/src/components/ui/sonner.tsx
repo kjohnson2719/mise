@@ -1,5 +1,5 @@
-import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { useTheme } from "@/components/theme/theme-context"
+import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { HugeiconsIcon } from "@hugeicons/react"
 import {
   CheckmarkCircle02Icon,
@@ -10,11 +10,11 @@ import {
 } from "@hugeicons/core-free-icons"
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { mode } = useTheme()
+  const { resolvedMode } = useTheme()
 
   return (
     <Sonner
-      theme={mode}
+      theme={resolvedMode}
       className="toaster group"
       icons={{
         success: (

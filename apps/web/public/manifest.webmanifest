@@ -1,23 +1,15 @@
 {
-  "name": "Nourvio",
-  "short_name": "Nourvio",
+  "name": "Merran",
+  "short_name": "Merran",
   "description": "Recipes, meal plans and shopping lists, with a cooking assistant.",
-  "start_url": "/recipes",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#fdfaf4",
   "theme_color": "#fdfaf4",
   "icons": [
-    {
-      "src": "/icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    },
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
     {
       "src": "/icons/maskable-512.png",
       "sizes": "512x512",
@@ -33,12 +25,7 @@
       "title": "title",
       "text": "text",
       "url": "url",
-      "files": [
-        {
-          "name": "file",
-          "accept": ["image/*", "application/pdf", "text/plain", "text/html"]
-        }
-      ]
+      "files": [{ "name": "file", "accept": ["image/*", "application/pdf"] }]
     }
   }
 }

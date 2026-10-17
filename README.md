@@ -1,180 +1,124 @@
-# Nourvio
+# Merran
 
-A self-hosted meal planner with an AI cooking assistant built in. Recipes, weekly plans, a pantry, shopping lists, nutrition and Walmart pickup orders for your household (and others you host), made to use from a phone or iPad while cooking.
+A self-hosted meal planner for households, with an AI cooking assistant at its center: recipes, a weekly plan, a shopping list, a pantry, nutrition and store connections, made for a phone or tablet on the kitchen counter. One server can host several households, kept apart, and a person can belong to more than one.
 
-**Status:** usable day to day. Recipes (imported from links, videos, text, photos or Mealie), AI tidy-ups, the assistant, households with invites, the meal plan, the shopping list, the pantry, nutrition (with grams for baking) and diet labels all work. Walmart ordering is parked while the app gets polished. See the [roadmap](docs/roadmap.md).
+**Status:** alpha. Releases start at `0.1.0-alpha.1`, and `0.1.0` comes once the rest of what's planned for it is done (see [docs/scope.md](docs/scope.md)). It's used day to day, but expect changes, and back up your data folder.
 
-## Run it with Docker Compose
+## What it does
 
-Nourvio runs as a small compose stack: the app, Postgres, and a job that backs up the database every night. The app image builds straight from this GitHub repo, so you only need two files on the server: `compose.yaml` and a `.env`.
+- **Recipes:** import from a link, many links at once, a video (TikTok, YouTube, Instagram, Facebook), text, photos or a PDF; move over from Mealie or Paprika. Scaling, units as written or US or metric, diet labels from the ingredients, nutrition, what each recipe costs, and a cook view for the counter with timers and hands-free steps read aloud.
+- **AI, with your own key:** Anthropic, OpenAI, Google or anything OpenAI-compatible (Ollama). It tidies recipes (you review each change), swaps ingredients you're out of, finds new recipes, reads receipts into the pantry, and an assistant can work with your recipes, plan and list. AI is optional; everything else works without it.
+- **Planning:** a week of meals, or a pool to cook in any order; Fill the week from your tastes and rules, with the reason for each pick; theme nights; a week that plans itself on a schedule.
+- **Shopping and the pantry:** a list from the plan, combined and converted, with what's at home taken off; sorted by aisle; live on every phone; usual buys; a pantry that cooking uses up.
+- **Stores:** find anything at the stores you shop at; send the list to Kroger's stores (Fry's, Ralphs, King Soopers...) with prices, sales and a weekly budget; and, experimentally, fill a Walmart cart through the browser extension.
+- **Everywhere:** a browser extension (import any page, the list in a side panel), Share to Merran from Android or an iPhone Shortcut, and a documented API with keys that say what they can do.
+- **Yours:** one container on SQLite with nothing to fill in, or Postgres. Everything beyond the basics is an optional module, nothing leaves the server unless you turn it on, and telemetry is opt-in and shows exactly what it sends.
 
-### With Dockge (or Portainer)
+The full list, with what's built and what's planned, is in [docs/features.md](docs/features.md).
 
-1. Create a new stack called `nourvio`.
-2. Paste the contents of [`compose.yaml`](compose.yaml) into the compose editor.
-3. Paste the contents of [`.env.example`](.env.example) into the `.env` editor and set `POSTGRES_PASSWORD` (see [Settings](#settings)).
-4. Deploy. The first build takes a few minutes, because Docker clones the repo and builds the web app.
-5. Open `http://<your-server>:3000`.
+## Run it
 
-### With the Docker CLI
-
-```bash
-mkdir nourvio && cd nourvio
-```
+One container, on SQLite, with everything in `./data`:
 
 ```bash
-curl -fsSLO https://raw.githubusercontent.com/Nourvio/nourvio/main/compose.yaml
+docker run -d --name merran -p 3000:3000 -v ./data:/data ghcr.io/merran-app/merran:next
+```
+
+Or with Docker Compose (Dockge, Portainer and the like work too), which also has Postgres, Kokoro (a voice for the cook view) and a Cloudflare tunnel ready behind profiles:
+
+```bash
+mkdir merran && cd merran
 ```
 
 ```bash
-curl -fsSL -o .env https://raw.githubusercontent.com/Nourvio/nourvio/main/.env.example
+curl -fsSLO https://raw.githubusercontent.com/merran-app/merran/main/compose.yaml
 ```
-
-Set `POSTGRES_PASSWORD` in `.env`, then start it:
 
 ```bash
-docker compose up -d --build
+curl -fsSL -o .env https://raw.githubusercontent.com/merran-app/merran/main/.env.example
 ```
 
-> **Docker Desktop on Windows:** Docker Compose 5 on Windows mistakes the GitHub URL for a folder path and fails with `failed to evaluate path "https://github.com/...`. Compose on Linux, which is what Dockge and Portainer use, builds from the URL fine. On Windows, clone the repo, set `MISE_BUILD_CONTEXT=.` in `.env`, and run the same command from the checkout.
-
-### Check that it's running
-
-`http://<your-server>:3000/api/health` should return:
-
-```json
-{ "status": "ok", "version": "dev", "database": "ok" }
+```bash
+docker compose up -d
 ```
 
-`"database": "unavailable"` means the app can't reach Postgres. Check the `db` container's logs.
+Nothing in `.env` needs filling in: it's there to change the port, set the address people reach Merran at (`MERRAN_PUBLIC_URL`), or move to Postgres (`docker compose --profile postgres up -d`, after setting `POSTGRES_PASSWORD` and `DATABASE_URL`).
 
-### First run: create your account
+### The first time
 
-1. Open the app. It asks for a **setup code**.
-2. Find the code in the app's log. In Dockge, open the `mise` container's logs; with the CLI, run `docker compose logs mise`. Look for:
+Open `http://<your-server>:3000`. Merran asks for a **setup code**, printed in its log so a stranger can't claim a fresh install:
 
-   ```
-   Welcome to Nourvio. Open the app to create the first
-   account, and enter this setup code: ABCD-EFGH-JKMN
-   ```
+```bash
+docker compose logs merran
+```
 
-3. Enter the code with your name, a username, a password (at least 10 characters) and a name for your household. You'll run the server and be your household's admin.
-4. Invite everyone else from **Settings → your household → Invite someone**. Each link works once, for 7 days; the person opens it and makes their own account. (For someone who won't open a link, like a kid, **Add without a link** lets you pick their username and password.)
+Then make your account and your household. Settings → This server is where AI keys, modules (video import, nutrition, stores, recipe sites...) and the rest are set up; Settings → Household is where invites, tastes and your stores are.
 
-**Other households.** One Nourvio can host several households, each with its own recipes and members, all using the server's AI keys. Invite someone as above and they join *your* household; to host another family, turn on **Settings → This server → Let anyone create an account**, and each sign-up starts a new household. Leave it off when the public link is on unless you need it, since anyone who finds the address could sign up. Settings → This server lists every household with its size and AI spending, and you can delete one.
+### Images
 
-The code changes every time the app restarts until the first account exists, and it stops working after that. It's there so a stranger who reaches the page before you can't claim it.
+`ghcr.io/merran-app/merran`, for amd64 and arm64 (a Raspberry Pi 4 or 5 works):
 
-## Settings
-
-Set these in `.env`, next to `compose.yaml`. Only `POSTGRES_PASSWORD` is required. Settings marked *later* belong to features that haven't shipped yet; it's safe to set them now.
-
-| Variable | Default | What it does |
-|---|---|---|
-| `POSTGRES_PASSWORD` | **required** | Password for the bundled Postgres. Use letters and numbers only, because it goes into a connection URL. Generate one with `openssl rand -hex 24`. |
-| `TZ` | `UTC` | Your timezone, for meal plan dates and backup file names. For example `America/Chicago`. |
-| `MISE_PORT` | `3000` | Port on the host for the web app |
-| `MISE_BUILD_CONTEXT` | `https://github.com/Nourvio/nourvio.git#main` | What to build. End it with `#<branch>`, `#<tag>` or `#<commit>`, or set it to `.` to build from a local checkout. |
-| `PUID` / `PGID` | `1000` | User and group that own `./data/app` on the host. The app drops to this user at startup instead of running as root. |
-| `BACKUP_KEEP_DAYS` | `14` | How many days of nightly backups to keep |
-| `PUBLIC_URL` | none | The address people use to reach Nourvio from outside, such as `https://nourvio.example.com`. Set it when you turn on the tunnel. |
-| `ANTHROPIC_API_KEY` | none | Claude API key. You can add it in the app under Settings instead; a key set here wins and can't be changed in the app. |
-| `OPENAI_API_KEY` | none | OpenAI API key, same as above |
-| `MISE_SECRET` | none | Encrypts API keys saved in the app. If empty, Nourvio creates a random one in `data/app/secret`. |
-| `YTDLP_AUTO_UPDATE` | `true` | Nourvio updates its copy of yt-dlp (which reads video links) at startup and weekly. Set to `false` to stop that. |
-| `USDA_API_KEY` | none | FoodData Central key for calculated nutrition, free from [api.data.gov](https://api.data.gov/signup/). Can also be added in Settings. |
-| `KOKORO_URL` | `http://kokoro:8880` | Where the `kokoro` service answers: cook mode's free read-aloud voice. Set it empty (`KOKORO_URL=`) if you remove that service. |
-| `KROGER_CLIENT_ID` / `KROGER_CLIENT_SECRET` | none | A free Kroger developer app, for sending the list to Fry's and other Kroger stores. Can also be added in Settings → Kroger, which shows the redirect URI to register (`PUBLIC_URL` + `/api/shop/kroger/callback`). |
-| `TUNNEL_TOKEN` | none | Cloudflare Tunnel token, only if you enable the tunnel (below) |
-
-## Your data
-
-Everything lives in `./data`, next to `compose.yaml`:
-
-| Folder | What's in it |
+| Tag | What it is |
 |---|---|
-| `data/app` | App files: recipe photos, and `secret`, which encrypts saved API keys. Back it up with the database. |
-| `data/postgres` | The database |
-| `data/backups` | Nightly database dumps (`mise-YYYY-MM-DD.dump`) |
+| `0.1.0-alpha.1`, `0.4.2` | That release, which never changes |
+| `next` | The newest release, pre-releases included |
+| `latest` | The newest release from 0.1.0 on (none yet) |
+| `0.4` | The newest release in 0.4 |
+| `edge` | Every commit to main, for testers |
 
-- **Backups:** back up the whole `data` folder, for example with ZFS snapshots of the dataset Dockge's stacks live on.
-- **Restoring a dump:**
-  1. Stop the `mise` container.
-  2. Run:
-
-     ```bash
-     docker compose exec db-backup pg_restore --clean --if-exists -d mise /backups/mise-YYYY-MM-DD.dump
-     ```
-  3. Start the `mise` container again.
-
-## Moving from Mealie
-
-In **Settings → Move from Mealie**, enter Mealie's address as the Nourvio server sees it (for example `http://192.168.1.20:9000`) and an API token from Mealie (your profile → API Tokens). **Connect** shows how many recipes there are; **Move** brings them over with photos, ratings and last-made dates. Running it again skips recipes already moved. Afterwards, **Settings → AI → Tidy up the whole library** can clean them up.
-
-## Recipes from videos
-
-Paste a TikTok, YouTube or Instagram link like any other. Nourvio reads the caption, the captions or (with an OpenAI key) the spoken words, and for short videos a few frames, then AI writes up the recipe. This needs an AI key, and the tools (yt-dlp and ffmpeg) come with the image.
-
-**Instagram and the occasional YouTube video** want a signed-in session. To give Nourvio one, export a `cookies.txt` from a browser where you're signed in (a "Get cookies.txt" browser extension does this), and put it at `data/app/cookies.txt`. Use an account you don't mind being used this way; sites can limit accounts that fetch a lot.
-
-**When video links stop working,** it's usually because a site changed. Nourvio updates yt-dlp weekly; restarting the stack makes it check right away.
-
-## Updating
-
-The app rebuilds from the branch in `MISE_BUILD_CONTEXT` every time the stack starts, reusing Docker's cache for anything that didn't change.
-
-- **Dockge:** use **Update**, or stop and start the stack.
-- **Docker CLI:** `docker compose up -d --build`
-
-Nourvio tells you when there's something new: the server admin sees an **Update** badge on Settings, and Settings → This server → Updates lists the changes. When an update changes `compose.yaml`, it says so, since your stack keeps its own copy.
-
-To stay on a fixed version, point `MISE_BUILD_CONTEXT` at a tag or commit instead of `#main`.
-
-Database changes run automatically when the app starts. The nightly dumps are your way back if an update goes wrong.
-
-## Reaching it from outside your network (optional)
-
-The compose file includes a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) service, which is turned off by default. A tunnel needs no open ports on your router.
-
-1. In the Cloudflare dashboard, create a tunnel and copy its token.
-2. Add a public hostname, such as `nourvio.example.com`, pointing to `http://mise:3000`.
-3. Put the token in `TUNNEL_TOKEN` in `.env`.
-4. Delete the `profiles: ["tunnel"]` line from the `cloudflared` service and redeploy. With the CLI you can run `docker compose --profile tunnel up -d` instead.
-5. Set `PUBLIC_URL` to the hostname.
-
-Everything except the sign-in and setup pages needs a login, and repeated wrong passwords lock that username for 15 minutes. Create your account (above) before you turn the tunnel on, and give everyone a password that isn't used anywhere else.
-
-## Developing
-
-You need Node 24 and Docker (for a local Postgres).
+Each image is signed with cosign and carries its SBOM and build provenance:
 
 ```bash
-npm install
+cosign verify ghcr.io/merran-app/merran:next --certificate-identity-regexp 'https://github.com/merran-app/merran/' --certificate-oidc-issuer https://token.actions.githubusercontent.com
+```
+
+### Updating
+
+Merran looks for a newer release every 6 hours (`MERRAN_UPDATE_CHECK=false` turns that off) and tells the server admin, with its notes, in the sidebar and Settings → This server. To update:
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Your data stays in `./data`. Merran changes the database itself at startup, and downgrades aren't supported, so keep a copy of `./data` from before an update.
+
+### Your data
+
+Everything Merran keeps is in the data folder: the SQLite database (unless you use Postgres), photos, and the key it seals saved secrets with (`secret`). Back up the whole folder. A household can also be exported on its own, to keep or to move to another Merran.
+
+## The browser extension
+
+For Chrome, Edge and Firefox: add a recipe from any page (even ones that turn servers away or need a sign-in), right-click a link or selected text, keep the shopping list in a side panel while you shop, and fill a Walmart cart. The zips are attached to each [release](https://github.com/merran-app/merran/releases); [apps/extension/README.md](apps/extension/README.md) says how to load and connect it.
+
+## Working on it
+
+Node 24 and pnpm (through corepack):
+
+```bash
+corepack enable
 ```
 
 ```bash
-cp .env.example .env
+pnpm install
 ```
 
 ```bash
-npm run db:up
+pnpm dev
 ```
 
-```bash
-npm run dev
-```
+The web app is on http://localhost:5173 and the API on :3000, on SQLite in `apps/server/data`; the setup code prints in the same terminal.
 
-- `.env` gives the API its `DATABASE_URL`. The example already points at the local database.
-- `npm run db:up` starts that local Postgres in Docker, and Kokoro for cook mode's voice (its image takes about 5 GB, downloaded on the first start).
-- `npm run dev` starts the web app on http://localhost:5173 and the API on :3000. Vite forwards `/api` to the API. The setup code prints in the same terminal.
-- `npm test` runs the server tests against an in-memory Postgres, so it doesn't need Docker.
+- `pnpm typecheck` and `pnpm format:check` (or `pnpm format`) for every package.
+- `pnpm --filter @merran/server test:all` runs the server's tests on SQLite and on Postgres (`pnpm --filter @merran/server db:test-postgres` starts a throwaway Postgres in Docker); `pnpm --filter @merran/shared test` the shared code's.
+- `pnpm --filter @merran/server openapi`, then `pnpm --filter @merran/web api` and `pnpm --filter @merran/extension api`, after changing the API.
+- `pnpm --filter @merran/server db:migration <name>` after changing the database's entities.
 
-More in [docs/development.md](docs/development.md).
+The repo: `apps/server` (Hono, MikroORM, the jobs), `apps/web` (React, TanStack Router and Query, shadcn/ui on Base UI), `apps/extension` (WXT) and `packages/shared` (what the server and the apps share: the ingredient parser, units, foods, planning). The plan and the reasoning behind it are in [docs/](docs/README.md).
 
-## Docs
+### Releases
 
-The plan and the reasoning behind it are in [`docs/`](docs/README.md): what we're building, the architecture, outside services, deployment, and how to work on the code.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs every check on each push and pull request, and publishes `edge` from main. A release is made by running **Release** in GitHub Actions on main with its version (`0.1.0-alpha.2`): it runs the checks again, builds and signs the images, zips the extension, and writes the GitHub release, tagged `v0.1.0-alpha.2`, with notes from the commits since the last one.
 
 ## License
 
-Copyright (C) 2026 Kyle Johnson. Nourvio is free software under the [GNU Affero General Public License v3.0](LICENSE) or later: run it, change it and share it. If you run a changed copy for other people over a network, offer them its source too.
+Copyright (C) 2026 Kyle Johnson. Merran is free software under the [GNU Affero General Public License v3.0](LICENSE) or later: run it, change it and share it. If you run a changed copy for other people over a network, offer them its source too.

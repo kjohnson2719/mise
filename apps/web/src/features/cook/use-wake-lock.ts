@@ -1,12 +1,11 @@
 import * as React from "react"
 
 /**
- * Keeps the screen on while mounted (Screen Wake Lock API). The browser drops
- * the lock when the tab is hidden, so it's requested again on return.
- * Returns whether the lock is currently held.
+ * Keeps the screen on while mounted. The browser lets go when the tab is
+ * hidden, so it's asked again on coming back. Says whether it's held.
  */
 export function useWakeLock() {
-  const [active, setActive] = React.useState(false)
+  const [held, setHeld] = React.useState(false)
 
   React.useEffect(() => {
     if (!("wakeLock" in navigator)) return
@@ -21,10 +20,11 @@ export function useWakeLock() {
           return
         }
         lock = next
-        setActive(true)
-        next.addEventListener("release", () => setActive(false))
+        setHeld(true)
+        next.addEventListener("release", () => setHeld(false))
       } catch {
-        setActive(false)
+        // Not allowed here, or the battery is low.
+        setHeld(false)
       }
     }
 
@@ -41,5 +41,5 @@ export function useWakeLock() {
     }
   }, [])
 
-  return active
+  return held
 }

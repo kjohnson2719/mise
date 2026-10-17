@@ -1,192 +1,188 @@
+import { Link, useNavigate } from "@tanstack/react-router"
 import * as React from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
-import { Alert02Icon } from "@hugeicons/core-free-icons"
-import type { ImportResult, ShareResult } from "@mise/shared"
-import { Link, useNavigate, useSearchParams } from "react-router"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { PageHeader } from "@/components/layout/page-header"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
-import { ApiError, api, apiUpload } from "@/lib/api"
+import { useRefreshRecipes } from "@/features/recipes/queries"
+import { api, ApiError, unwrap } from "@/lib/api/client"
+import { shrinkPhoto } from "@/lib/shrink-photo"
 
 import { forgetShared, readShared } from "./shared-files"
 
-type Step =
-  | { state: "working"; what: string; detail?: string }
-  | { state: "failed"; message: string; link?: string }
-  | { state: "unknown"; got: string }
-  | { state: "unsupported" }
+/**
+ * What Android's share sheet hands over, as the manifest's share target
+ * asks: text and a link, or the id the service worker kept photos and PDFs
+ * under. `lost` says files came when there was no service worker to keep
+ * them.
+ */
+export type ShareSearch = {
+  title?: string
+  text?: string
+  url?: string
+  id?: string
+  lost?: true
+}
 
-const hostOf = (link: string) => {
+/**
+ * Photos go no wider than this, as the receipt scanner sends them: a
+ * shared photo is read as a receipt first, and a long one's print has to
+ * stay readable.
+ */
+const MAX_WIDTH = 1600
+
+/** The site a shared link is on, for "Adding the recipe from example.com…". */
+function siteOf({ title, text, url }: ShareSearch) {
+  const link = [url, text, title].join(" ").match(/https?:\/\/[^\s<>"']+/)?.[0]
+  if (!link) return null
   try {
-    return new URL(link).hostname.replace(/^(www|m|vm)\./, "")
+    return new URL(link).hostname.replace(/^(?:www|m)\./, "")
   } catch {
-    return "the link"
+    return null
   }
 }
 
-const VIDEO_SITES = /(tiktok|instagram|youtube|youtu\.be|facebook|fb\.watch)/i
+/**
+ * Sends on what the service worker kept, made smaller, then forgets it:
+ * null when it's gone.
+ */
+async function sendKept(id: string) {
+  const shared = await readShared(id)
+  if (!shared || shared.files.length === 0) return null
+  const form = new FormData()
+  for (const key of ["title", "text", "url"] as const) {
+    const value = shared[key]
+    if (value) form.append(key, value)
+  }
+  for (const file of shared.files) {
+    const body = file.type.startsWith("image/")
+      ? await shrinkPhoto(file, MAX_WIDTH, "width")
+      : file
+    form.append("file", body, file.name)
+  }
+  try {
+    return await unwrap(
+      api.POST("/api/share", {
+        body: form as unknown as { title?: string },
+      })
+    )
+  } finally {
+    // Dealt with either way, so going back doesn't send it again.
+    void forgetShared(id)
+  }
+}
 
 /**
- * Something shared into Nourvio, worked out on its own: a link (a recipe page
- * or a video) is imported, a receipt opens its review, and photos or text of
- * a recipe become one. `?link=` and `?inbox=` come from the server (an
- * iPhone Shortcut), `?id=` from the service worker (Android).
+ * Something shared to Merran from Android's share sheet: added, then on to
+ * the recipe, the import or the receipt; or said why not.
  */
-export function SharePage() {
-  const [params] = useSearchParams()
+export function SharePage({ search }: { search: ShareSearch }) {
+  const { t } = useTranslation()
   const navigate = useNavigate()
-  const link = params.get("link")
-  const inbox = params.get("inbox")
-  const cached = params.get("id")
-  const [step, setStep] = React.useState<Step>(() =>
-    params.get("unsupported")
-      ? { state: "unsupported" }
-      : { state: "working", what: "Opening what you shared…" }
-  )
+  const refreshRecipes = useRefreshRecipes()
+  const [failed, setFailed] = React.useState<string | null>(null)
+  const nothing =
+    !search.title && !search.text && !search.url && !search.id && !search.lost
 
-  const started = React.useRef<string | null>(null)
+  // Once, even when React runs effects twice.
+  const started = React.useRef(false)
   React.useEffect(() => {
-    const key = link ?? inbox ?? cached
-    if (!key || started.current === key) return
-    started.current = key
-
-    const fail = (error: unknown, failedLink?: string) =>
-      setStep({
-        state: "failed",
-        message: error instanceof ApiError ? error.message : "That didn't work",
-        link: failedLink,
-      })
-
-    async function importLink(url: string) {
-      setStep({
-        state: "working",
-        what: `Importing the recipe from ${hostOf(url)}…`,
-        detail: VIDEO_SITES.test(url)
-          ? "Videos take a minute or two: Nourvio watches and listens for the recipe."
-          : undefined,
-      })
+    if (nothing || search.lost || started.current) return
+    started.current = true
+    void (async () => {
       try {
-        const result = await api<ImportResult>("/import/url", {
-          body: { url },
-        })
-        if (result.duplicate) toast.success("Already in your recipes")
-        navigate(`/recipes/${result.recipe.slug}`, { replace: true })
-      } catch (error) {
-        fail(error, url)
-      }
-    }
-
-    async function openShared(id: string) {
-      setStep({ state: "working", what: "Reading what you shared…" })
-      try {
-        const { result } = await api<{ result: ShareResult }>(`/share/${id}`, {
-          method: "POST",
-        })
-        if (result.kind === "link") return importLink(result.link)
-        if (result.kind === "receipt") {
-          return navigate(`/pantry/receipt?id=${result.id}`, { replace: true })
+        const result = search.id
+          ? await sendKept(search.id)
+          : await unwrap(
+              api.POST("/api/share", {
+                body: {
+                  title: search.title,
+                  text: search.text,
+                  url: search.url,
+                },
+              })
+            )
+        if (!result) {
+          setFailed(t("share.gone"))
+          return
         }
-        if (result.kind === "recipe") {
-          toast.success(`Added ${result.name} to your recipes`)
-          return navigate(`/recipes/${result.slug}`, { replace: true })
+        if (result.outcome === "importing" && result.importId) {
+          // Several links: on to their import, going in the background.
+          await navigate({
+            to: "/recipes/import/$importId",
+            params: { importId: result.importId },
+            replace: true,
+          })
+          return
         }
-        setStep({ state: "unknown", got: result.got })
-      } catch (error) {
-        fail(error)
-      }
-    }
-
-    async function handOver(id: string) {
-      const shared = await readShared(id)
-      if (!shared || (!shared.files.length && !shared.text)) {
-        setStep({
-          state: "failed",
-          message: "Nothing came through from the share. Try sharing it again.",
+        if (result.outcome === "receipt" && result.receiptId) {
+          // A receipt: on to look it over for the pantry.
+          await navigate({
+            to: "/pantry/receipts/$receiptId",
+            params: { receiptId: result.receiptId },
+            replace: true,
+          })
+          return
+        }
+        if (result.outcome === "failed" || !result.recipe) {
+          setFailed(result.message)
+          return
+        }
+        const { name, slug } = result.recipe
+        await refreshRecipes()
+        toast.success(
+          result.outcome === "added"
+            ? t("share.added", { name })
+            : t("share.already", { name })
+        )
+        // In place of this page, so going back doesn't share it again.
+        await navigate({
+          to: "/recipes/$slug",
+          params: { slug },
+          replace: true,
         })
-        return
+      } catch (err) {
+        if (!(err instanceof ApiError)) throw err
+        setFailed(err.message)
       }
-      const form = new FormData()
-      for (const file of shared.files) form.append("file", file)
-      if (shared.text) form.append("text", shared.text)
-      try {
-        const { url } = await apiUpload<{ url: string }>("/share", form)
-        void forgetShared(id)
-        const next = new URL(url, location.origin)
-        const nextLink = next.searchParams.get("link")
-        const nextInbox = next.searchParams.get("inbox")
-        if (nextLink) await importLink(nextLink)
-        else if (nextInbox) await openShared(nextInbox)
-        // Several links: they're importing already.
-        else navigate(next.pathname, { replace: true })
-      } catch (error) {
-        fail(error)
-      }
-    }
+    })()
+  }, [nothing, search, navigate, refreshRecipes, t])
 
-    if (link) void importLink(link)
-    else if (inbox) void openShared(inbox)
-    else if (cached) void handOver(cached)
-  }, [link, inbox, cached, navigate])
-
-  if (!link && !inbox && !cached && step.state === "working") {
-    return (
-      <>
-        <PageHeader title="Shared to Nourvio" />
-        <p className="text-muted-foreground">Nothing was shared.</p>
-      </>
-    )
-  }
+  const site = siteOf(search)
+  const problem = failed ?? (search.lost ? t("share.lost") : null)
 
   return (
     <>
-      <PageHeader title="Shared to Nourvio" />
-      {step.state === "working" ? (
-        <div className="grid max-w-xl gap-1.5">
-          <p className="flex items-center gap-2 font-medium">
-            <Spinner /> {step.what}
-          </p>
-          {step.detail && (
-            <p className="text-sm text-muted-foreground">{step.detail}</p>
-          )}
-        </div>
-      ) : step.state === "unsupported" ? (
-        <p className="max-w-xl text-muted-foreground">
-          Sharing into Nourvio needs it opened at its https address (your
-          Cloudflare tunnel, say), installed to the home screen from there.
-        </p>
-      ) : (
-        <div className="grid max-w-xl justify-items-start gap-3">
-          <p className="flex gap-2 text-muted-foreground">
-            <HugeiconsIcon
-              icon={Alert02Icon}
-              strokeWidth={2}
-              className="mt-0.5 size-4 shrink-0"
-            />
-            {step.state === "unknown"
-              ? `Nourvio couldn't tell what that was: it doesn't look like a receipt, a recipe or a link. It got ${step.got}.`
-              : step.message}
-          </p>
+      <PageHeader title={t("share.title")} />
+      {nothing ? (
+        <p className="text-muted-foreground">{t("share.nothing")}</p>
+      ) : problem ? (
+        <div className="grid max-w-xl justify-items-start gap-4">
+          <Alert>
+            <AlertTitle>{t("share.notAdded")}</AlertTitle>
+            <AlertDescription>{problem}</AlertDescription>
+          </Alert>
           <div className="flex flex-wrap gap-2">
-            {step.state === "failed" && step.link ? (
-              <Button asChild>
-                <Link to={`/recipes?url=${encodeURIComponent(step.link)}`}>
-                  Try it in the import window
-                </Link>
-              </Button>
-            ) : (
-              <>
-                <Button variant="outline" asChild>
-                  <Link to="/pantry/receipt">Scan a receipt</Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link to="/recipes?import=photo">Add a recipe</Link>
-                </Button>
-              </>
-            )}
+            <Button render={<Link to="/recipes/new" />}>
+              {t("share.addRecipe")}
+            </Button>
+            <Button variant="outline" render={<Link to="/recipes" />}>
+              {t("share.toRecipes")}
+            </Button>
           </div>
         </div>
+      ) : (
+        <p className="flex items-center gap-2 font-medium" aria-live="polite">
+          <Spinner />
+          {search.id
+            ? t("share.reading")
+            : site
+              ? t("share.adding", { site })
+              : t("share.addingSomething")}
+        </p>
       )}
     </>
   )

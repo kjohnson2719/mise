@@ -1,5 +1,5 @@
 // Checks WCAG contrast for every palette block in src/index.css.
-// Run: npm run check:contrast -w @mise/web   (exits 1 if any pair fails)
+// Run: pnpm --filter @merran/web check:contrast   (exits 1 if any pair fails)
 import { readFileSync } from "node:fs"
 
 const css = readFileSync(new URL("../src/index.css", import.meta.url), "utf8")

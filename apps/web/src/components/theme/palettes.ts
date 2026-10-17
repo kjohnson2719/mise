@@ -1,12 +1,10 @@
-import type { PaletteName } from "@mise/shared"
-
-/** The palette names live in @mise/shared, because accounts save them too. */
-export type Palette = PaletteName
+export type Palette = "sage" | "paprika" | "castiron"
 
 export type PaletteOption = {
   value: Palette
-  name: string
-  description: string
+  /** Translation keys for the palette's name and description. */
+  nameKey: string
+  descriptionKey: string
   /** Fixed preview colors, so every option shows its own colors in the picker. */
   swatches: { background: string; primary: string; highlight: string }
 }
@@ -15,8 +13,8 @@ export type PaletteOption = {
 export const PALETTES: PaletteOption[] = [
   {
     value: "sage",
-    name: "Sage & Cream",
-    description: "Herb green on warm cream, terracotta highlights",
+    nameKey: "theme.palettes.sage.name",
+    descriptionKey: "theme.palettes.sage.description",
     swatches: {
       background: "#fdfaf4",
       primary: "#356844",
@@ -25,8 +23,8 @@ export const PALETTES: PaletteOption[] = [
   },
   {
     value: "paprika",
-    name: "Paprika & Linen",
-    description: "Burnt orange on linen, olive highlights",
+    nameKey: "theme.palettes.paprika.name",
+    descriptionKey: "theme.palettes.paprika.description",
     swatches: {
       background: "#fdf8f1",
       primary: "#be4806",
@@ -35,8 +33,8 @@ export const PALETTES: PaletteOption[] = [
   },
   {
     value: "castiron",
-    name: "Cast Iron & Saffron",
-    description: "Warm charcoal with saffron accents",
+    nameKey: "theme.palettes.castiron.name",
+    descriptionKey: "theme.palettes.castiron.description",
     swatches: {
       background: "#fbfaf7",
       primary: "#2d2823",

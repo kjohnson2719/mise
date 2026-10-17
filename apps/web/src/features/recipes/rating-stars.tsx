@@ -1,60 +1,78 @@
-import { HugeiconsIcon } from "@hugeicons/react"
 import { StarIcon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { useTranslation } from "react-i18next"
 
 import { cn } from "@/lib/utils"
 
-const STARS = [1, 2, 3, 4, 5]
+const STARS = [1, 2, 3, 4, 5] as const
 
-/** Read-only stars, or tappable ones when `onChange` is given (tap the same star to clear). */
+/** A rating, shown as stars. */
 export function RatingStars({
+  rating,
+  className,
+}: {
+  rating: number
+  className?: string
+}) {
+  const { t } = useTranslation()
+  return (
+    <span
+      role="img"
+      aria-label={t("recipes.rating.label", { count: rating })}
+      className={cn("inline-flex items-center text-highlight", className)}
+    >
+      {STARS.map((star) => (
+        <HugeiconsIcon
+          key={star}
+          icon={StarIcon}
+          strokeWidth={2}
+          className={cn(
+            "size-3.5",
+            star <= rating ? "[&_path]:fill-current" : "opacity-30"
+          )}
+        />
+      ))}
+    </span>
+  )
+}
+
+/** Five stars to pick a rating with. Picking the one already chosen clears it. */
+export function RatingInput({
   value,
   onChange,
-  size = "sm",
+  id,
 }: {
   value: number | null
-  onChange?: (rating: number | null) => void
-  size?: "sm" | "md"
+  onChange: (rating: number | null) => void
+  id?: string
 }) {
-  const icon = size === "md" ? "size-6" : "size-4"
-
-  if (!onChange) {
-    if (!value) return null
-    return (
-      <span
-        role="img"
-        aria-label={`Rated ${value} out of 5`}
-        className="flex text-highlight"
-      >
-        {STARS.map((star) => (
-          <HugeiconsIcon
-            key={star}
-            icon={StarIcon}
-            strokeWidth={2}
-            className={cn(icon, star <= value ? "fill-current" : "opacity-30")}
-          />
-        ))}
-      </span>
-    )
-  }
-
+  const { t } = useTranslation()
   return (
-    <div role="radiogroup" aria-label="Rating" className="flex">
+    <div
+      id={id}
+      role="radiogroup"
+      aria-label={t("recipes.fields.rating")}
+      className="-ml-1 flex items-center"
+    >
       {STARS.map((star) => {
-        const filled = value !== null && star <= value
+        const on = value !== null && star <= value
         return (
           <button
             key={star}
             type="button"
             role="radio"
             aria-checked={value === star}
-            aria-label={`${star} star${star === 1 ? "" : "s"}`}
+            aria-label={t("recipes.rating.label", { count: star })}
             onClick={() => onChange(value === star ? null : star)}
             className="rounded-full p-1 text-highlight transition-transform outline-none hover:scale-110 focus-visible:ring-[3px] focus-visible:ring-ring/50"
           >
             <HugeiconsIcon
               icon={StarIcon}
               strokeWidth={2}
-              className={cn(icon, filled ? "fill-current" : "opacity-40")}
+              className={cn(
+                "size-6",
+                on ? "[&_path]:fill-current" : "opacity-40"
+              )}
             />
           </button>
         )

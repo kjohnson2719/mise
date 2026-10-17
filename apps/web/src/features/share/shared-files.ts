@@ -1,61 +1,64 @@
-/** Where the service worker keeps what was shared into Nourvio (public/sw.js). */
-const SHARE_CACHE = "mise-share"
+// Files shared to Merran from Android's share sheet. The share target posts
+// them, and the service worker (public/sw.js) keeps them in Cache Storage
+// for the share page, under an id it gives it in the address.
 
-export type Shared = { files: File[]; text: string | null }
+/** Each share's cache is named this and its id, as the service worker does. */
+const SHARE_CACHE = "merran-share-"
+
+/** A share the service worker kept: its files, and any text or link with them. */
+export type KeptShare = {
+  title?: string
+  text?: string
+  url?: string
+  files: File[]
+}
 
 /** What was shared, by the id the service worker gave it; null if it's gone. */
-export async function readShared(id: string): Promise<Shared | null> {
-  if (typeof caches === "undefined") return null
+export async function readShared(id: string): Promise<KeptShare | null> {
+  const name = SHARE_CACHE + id
   try {
-    const cache = await caches.open(SHARE_CACHE)
-    const about = await cache.match(`/shared/${id}/about`)
+    if (typeof caches === "undefined" || !(await caches.has(name))) return null
+    const cache = await caches.open(name)
+    const about = await cache.match("/shared/about")
     if (!about) return null
-    const info = (await about.json()) as { text: string; files: number }
+    const { files: count, ...text } = (await about.json()) as Omit<
+      KeptShare,
+      "files"
+    > & { files: number }
     const files: File[] = []
-    for (let index = 0; index < info.files; index++) {
-      const res = await cache.match(`/shared/${id}/${index}`)
+    for (let index = 0; index < count; index++) {
+      const res = await cache.match(`/shared/${index}`)
       if (!res) continue
       const blob = await res.blob()
-      const name = decodeURIComponent(
-        res.headers.get("x-file-name") ?? `shared-${index}`
+      const fileName = decodeURIComponent(
+        res.headers.get("x-file-name") ?? `shared-${index + 1}`
       )
-      files.push(new File([blob], name, { type: blob.type }))
+      files.push(new File([blob], fileName, { type: blob.type }))
     }
-    return { files, text: info.text || null }
+    return { ...text, files }
   } catch {
     return null
   }
 }
 
-/** Forgets something shared once it's been dealt with. */
+/** Forgets a share once it's been sent on. */
 export async function forgetShared(id: string) {
-  if (typeof caches === "undefined") return
   try {
-    const cache = await caches.open(SHARE_CACHE)
-    for (const request of await cache.keys()) {
-      if (new URL(request.url).pathname.startsWith(`/shared/${id}/`)) {
-        await cache.delete(request)
-      }
-    }
+    await caches.delete(SHARE_CACHE + id)
   } catch {
-    // Left for the browser to clear.
+    // The service worker clears it out after a day.
   }
 }
 
 /**
- * Registers the service worker, which is what lets Android share into Nourvio.
- * Browsers only allow it over https, or on this computer.
+ * Registers the service worker, which lets Android share photos and PDFs to
+ * Merran. Browsers only have it over https, or on this computer.
  */
 export function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return
-  const secure =
-    location.protocol === "https:" ||
-    location.hostname === "localhost" ||
-    location.hostname === "127.0.0.1"
-  if (!secure) return
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register("/sw.js").catch(() => {
-      // Sharing into Nourvio just won't be offered.
+      // Sharing text and links still works, through the share page's address.
     })
   })
 }

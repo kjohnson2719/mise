@@ -1,175 +1,357 @@
+import {
+  ArrowDataTransferHorizontalIcon,
+  ArrowTurnBackwardIcon,
+  MinusSignCircleIcon,
+  MinusSignIcon,
+  PlusSignIcon,
+} from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { ArrowDataTransferHorizontalIcon } from "@hugeicons/core-free-icons"
-import { formatIngredient, type RecipeIngredient } from "@mise/shared"
+import { displayIngredient, type UnitSystem } from "@merran/shared"
+import * as React from "react"
+import { useTranslation } from "react-i18next"
 
+import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
 import { cn } from "@/lib/utils"
 
-import type { SwappedFrom } from "./swaps"
-import { useUnitMode } from "./unit-toggle"
+import { formatServings } from "./format"
+import type { Recipe } from "./queries"
+import type { SwappedLine } from "./swaps/this-time"
+import type { LeftOutLine } from "./use-tastes"
 
-/** Groups items by section, keeping their order. */
-export function groupBySection<T extends { section: string | null }>(
-  items: T[]
-) {
-  const groups: { section: string | null; items: T[] }[] = []
-  for (const item of items) {
+type Line = Recipe["ingredients"][number]
+
+/** Lines grouped under their sections, in order. */
+export function bySection<T extends { section: string | null }>(lines: T[]) {
+  const groups: { section: string | null; lines: T[] }[] = []
+  for (const line of lines) {
     const last = groups.at(-1)
-    if (last && last.section === item.section) last.items.push(item)
-    else groups.push({ section: item.section, items: [item] })
+    if (last && last.section === line.section) last.lines.push(line)
+    else groups.push({ section: line.section, lines: [line] })
   }
   return groups
 }
 
-/** "2 cups flour, sifted", scaled, with the amount and unit in bold. */
-export function IngredientText({
-  text,
-  factor = 1,
-  unitGrams,
-}: {
-  text: string
-  factor?: number
-  /** Show the amount in grams, from this many grams per unit. */
-  unitGrams?: number | null
-}) {
-  const { amount, rest } = formatIngredient(text, factor, unitGrams)
+/** How many it's made for: the recipe's servings, or a multiple of it. */
+export function useServings(recipe: Recipe) {
+  const base = recipe.servings
+  const [amount, setAmount] = React.useState(base ?? 1)
+  const step = base === null || amount <= 2 ? 0.5 : 1
+  return {
+    /** What the amounts are multiplied by. */
+    factor: base ? amount / base : amount,
+    amount,
+    base,
+    more: () => setAmount((value) => value + step),
+    fewer: () => setAmount((value) => Math.max(step, value - step)),
+    reset: () => setAmount(base ?? 1),
+    changed: amount !== (base ?? 1),
+  }
+}
+
+export type Servings = ReturnType<typeof useServings>
+
+/** − 4 servings + : making more or less of the recipe. */
+export function ServingsStepper({ servings }: { servings: Servings }) {
+  const { t } = useTranslation()
+  const label = servings.base
+    ? t("recipes.servings", {
+        count: servings.amount,
+        servings: formatServings(servings.amount),
+      })
+    : t("recipes.times", { factor: formatServings(servings.amount) })
   return (
-    <>
-      {amount && <span className="font-semibold">{amount}</span>}
-      {rest}
-    </>
+    <div className="flex items-center gap-2">
+      {/* Always laid out, on the far side from the +, so showing it never
+          moves the stepper out from under a second tap. */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={servings.reset}
+        disabled={!servings.changed}
+        aria-hidden={!servings.changed}
+        className={cn(!servings.changed && "invisible")}
+      >
+        {t("recipes.reset")}
+      </Button>
+      <Button
+        variant="outline"
+        size="icon-sm"
+        onClick={servings.fewer}
+        aria-label={t("recipes.fewerServings")}
+      >
+        <HugeiconsIcon icon={MinusSignIcon} strokeWidth={2} />
+      </Button>
+      <span
+        className="min-w-24 text-center text-sm font-medium tabular-nums"
+        aria-live="polite"
+      >
+        {label}
+      </span>
+      <Button
+        variant="outline"
+        size="icon-sm"
+        onClick={servings.more}
+        aria-label={t("recipes.moreServings")}
+      >
+        <HugeiconsIcon icon={PlusSignIcon} strokeWidth={2} />
+      </Button>
+    </div>
   )
 }
 
+/** A line as shown, at a scale and in units: "2 ½ tbsp tomato paste". */
+function shownLine(
+  text: string,
+  options: { factor: number; system: UnitSystem }
+) {
+  const { amount, rest } = displayIngredient(text, options)
+  return `${amount}${rest}`
+}
+
+/** Whether showing metric or US amounts would change any line. */
+export function convertible(lines: Line[]) {
+  return lines.some((line) =>
+    (["metric", "us"] as const).some(
+      (system) =>
+        displayIngredient(line.text, { system }).amount !==
+        displayIngredient(line.text).amount
+    )
+  )
+}
+
+/** As written, metric or US. */
+export function UnitToggle({
+  system,
+  onChange,
+  className,
+}: {
+  system: UnitSystem
+  onChange: (system: UnitSystem) => void
+  className?: string
+}) {
+  const { t } = useTranslation()
+  return (
+    <ToggleGroup
+      variant="outline"
+      size="sm"
+      value={[system]}
+      onValueChange={(value) => {
+        const next = value[0] as UnitSystem | undefined
+        if (next) onChange(next)
+      }}
+      aria-label={t("recipes.units.label")}
+      className={className}
+    >
+      {(["written", "metric", "us"] as const).map((value) => (
+        <ToggleGroupItem key={value} value={value} className="grow">
+          {t(`recipes.units.${value}`)}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
+  )
+}
+
+/** Ingredients ticked off while getting things out, by id. */
+export function useTicks(initial: Iterable<string> = []) {
+  const [ticked, setTicked] = React.useState<ReadonlySet<string>>(
+    () => new Set(initial)
+  )
+  const toggle = React.useCallback(
+    (id: string) =>
+      setTicked((current) => {
+        const next = new Set(current)
+        if (!next.delete(id)) next.add(id)
+        return next
+      }),
+    []
+  )
+  const clear = React.useCallback(() => setTicked(new Set()), [])
+  return { ticked, toggle, clear }
+}
+
+export type Ticks = ReturnType<typeof useTicks>
+
 /**
- * A checklist of ingredients, scaled by `factor`, with optional
- * highlighting, as written or in grams (the remembered choice).
+ * The ingredients, with their amounts scaled and in the chosen units.
+ * Each can be ticked off while getting things out; ones left out for
+ * someone who doesn't like them are crossed off, saying who for.
  */
 export function IngredientList({
-  ingredients,
+  lines,
   factor,
   factorOf,
-  checked,
-  onToggle,
+  system,
+  ticks,
   highlighted,
-  idPrefix = "ingredient",
-  size = "md",
+  leftOut,
+  swapped,
   onSwap,
-  swappedFrom,
-  onUndoSwap,
+  onUnswap,
+  size = "default",
 }: {
-  ingredients: RecipeIngredient[]
+  lines: Line[]
   factor: number
-  /** A different scale for some lines, like a sauce paired with this recipe. */
-  factorOf?: (id: string) => number
-  checked: Set<string>
-  onToggle: (id: string) => void
-  highlighted?: Set<string>
-  idPrefix?: string
-  size?: "md" | "lg"
-  /** Offer "out of this?" on each line. */
-  onSwap?: (ingredient: RecipeIngredient) => void
-  /** Lines swapped in this time, and what they replaced. */
-  swappedFrom?: SwappedFrom
-  onUndoSwap?: (originalId: string) => void
+  /** Each line's own factor, when they differ: a sauce made with a main. */
+  factorOf?: (lineId: string) => number
+  system: UnitSystem
+  /** Ticks kept by the page, as the cook view does; otherwise kept here. */
+  ticks?: Ticks
+  /** Lines to pick out, like the ones the current step uses. */
+  highlighted?: ReadonlySet<string>
+  /** Lines left out for the household's dislikes, by id. */
+  leftOut?: ReadonlyMap<string, LeftOutLine>
+  /** Lines of a stand-in used this time, by id: what they're instead of. */
+  swapped?: ReadonlyMap<string, SwappedLine>
+  /** Offers stand-ins for a line. */
+  onSwap?: (line: Line) => void
+  /** Goes back to a swapped line's ingredient, by its id. */
+  onUnswap?: (ingredientId: string) => void
+  size?: "default" | "lg"
 }) {
-  const [mode] = useUnitMode()
-  const grams = mode === "grams"
-  if (!ingredients.length) {
-    return <p className="text-muted-foreground">No ingredients listed.</p>
-  }
+  const { t } = useTranslation()
+  const own = useTicks()
+  const { ticked, toggle } = ticks ?? own
 
   return (
-    <div className="grid gap-5">
-      {groupBySection(ingredients).map((group, index) => (
-        <div key={`${group.section}-${index}`} className="grid gap-1">
+    <div className="-mx-2 grid gap-5">
+      {bySection(lines).map((group, index) => (
+        <section key={index}>
           {group.section && (
-            <h3 className="mb-1 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
+            <h3 className="mb-1 px-2 text-sm font-semibold tracking-wide text-muted-foreground uppercase">
               {group.section}
             </h3>
           )}
           <ul className="grid gap-0.5">
-            {group.items.map((ingredient) => {
-              const id = `${idPrefix}-${ingredient.id}`
-              const done = checked.has(ingredient.id)
-              const lit = highlighted?.has(ingredient.id)
-              const swapped = swappedFrom?.get(ingredient.id)
-              return (
-                <li
-                  key={ingredient.id}
-                  className={cn(
-                    "group flex items-start gap-3 rounded-xl px-2 py-1.5 transition-colors",
-                    lit && "bg-accent text-accent-foreground"
-                  )}
+            {group.lines.map((line) => {
+              const { amount, rest } = displayIngredient(line.text, {
+                factor: factorOf?.(line.id) ?? factor,
+                system,
+              })
+              const out = leftOut?.get(line.id)
+              const swapButton = onSwap && (
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="mt-0.5 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+                  aria-label={t("recipes.swaps.button", { line: line.text })}
+                  title={t("recipes.swaps.button", { line: line.text })}
+                  onClick={() => onSwap(line)}
                 >
-                  <Checkbox
-                    id={id}
-                    checked={done}
-                    onCheckedChange={() => onToggle(ingredient.id)}
-                    className={size === "lg" ? "mt-1 size-5" : "mt-0.5"}
+                  <HugeiconsIcon
+                    icon={ArrowDataTransferHorizontalIcon}
+                    strokeWidth={2}
                   />
-                  <div className="grid min-w-0 flex-1 gap-0.5">
-                    <Label
-                      htmlFor={id}
+                </Button>
+              )
+              if (out) {
+                return (
+                  <li key={line.id} className="group flex items-start gap-1">
+                    <div
                       className={cn(
-                        "leading-snug font-normal",
+                        "flex min-w-0 flex-1 items-start gap-3 rounded-xl px-2 py-1.5 text-muted-foreground",
+                        size === "lg" && "py-2"
+                      )}
+                    >
+                      <HugeiconsIcon
+                        icon={MinusSignCircleIcon}
+                        strokeWidth={2}
+                        className={cn(
+                          "size-4 shrink-0",
+                          size === "lg" ? "mt-1.5" : "mt-1"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "leading-snug",
+                          size === "lg" ? "text-lg" : "text-base"
+                        )}
+                      >
+                        <span className="line-through">
+                          {amount && (
+                            <span className="font-semibold">{amount}</span>
+                          )}
+                          {rest}
+                        </span>{" "}
+                        <span className="text-sm whitespace-nowrap">
+                          {out.who
+                            ? t("recipes.tastes.lineFor", { who: out.who })
+                            : t("recipes.tastes.line")}
+                        </span>
+                      </span>
+                    </div>
+                    {swapButton}
+                  </li>
+                )
+              }
+              const done = ticked.has(line.id)
+              const swap = swapped?.get(line.id)
+              return (
+                <li key={line.id} className="group flex items-start gap-1">
+                  <label
+                    className={cn(
+                      "flex min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-muted/60",
+                      highlighted?.has(line.id) &&
+                        !done &&
+                        "bg-accent text-accent-foreground hover:bg-accent/80",
+                      size === "lg" && "py-2"
+                    )}
+                  >
+                    <Checkbox
+                      checked={done}
+                      onCheckedChange={() => toggle(line.id)}
+                      className={size === "lg" ? "mt-1" : "mt-0.5"}
+                    />
+                    <span
+                      className={cn(
+                        "leading-snug",
                         size === "lg" ? "text-lg" : "text-base",
                         done && "text-muted-foreground line-through"
                       )}
                     >
-                      <span>
-                        <IngredientText
-                          text={ingredient.text}
-                          factor={factorOf?.(ingredient.id) ?? factor}
-                          unitGrams={grams ? ingredient.unitGrams : null}
-                        />
-                      </span>
-                    </Label>
-                    {swapped && ingredient.id.endsWith("~0") && (
-                      <span className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                        <span>
-                          Instead of{" "}
-                          <IngredientText
-                            text={swapped.original.text}
-                            factor={factorOf?.(swapped.originalId) ?? factor}
-                            unitGrams={
-                              grams ? swapped.original.unitGrams : null
-                            }
-                          />
+                      {amount && (
+                        <span className="font-semibold">{amount}</span>
+                      )}
+                      {rest}
+                      {swap && (
+                        <span className="ml-1.5 text-sm text-primary">
+                          {t("recipes.swaps.insteadOf", {
+                            line: shownLine(swap.insteadOf, {
+                              factor: factorOf?.(line.id) ?? factor,
+                              system,
+                            }),
+                          })}
                         </span>
-                        {onUndoSwap && (
-                          <button
-                            type="button"
-                            onClick={() => onUndoSwap(swapped.originalId)}
-                            className="font-medium text-primary hover:underline"
-                          >
-                            Undo
-                          </button>
-                        )}
-                      </span>
-                    )}
-                  </div>
-                  {onSwap && !swapped && (
-                    <button
-                      type="button"
-                      onClick={() => onSwap(ingredient)}
-                      aria-label={`Out of ${ingredient.food ?? ingredient.text}? Swap it`}
-                      title="Out of this? Swap it"
-                      className="flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground opacity-0 transition-opacity outline-none group-hover:opacity-100 hover:bg-secondary hover:text-foreground focus-visible:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 pointer-coarse:opacity-60"
-                    >
-                      <HugeiconsIcon
-                        icon={ArrowDataTransferHorizontalIcon}
-                        strokeWidth={2}
-                        className="size-4"
-                      />
-                    </button>
-                  )}
+                      )}
+                    </span>
+                  </label>
+                  {swap
+                    ? onUnswap && (
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
+                          className="mt-0.5 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+                          aria-label={t("recipes.swaps.unswap", {
+                            line: swap.insteadOf,
+                          })}
+                          title={t("recipes.swaps.unswap", {
+                            line: swap.insteadOf,
+                          })}
+                          onClick={() => onUnswap(swap.ingredientId)}
+                        >
+                          <HugeiconsIcon
+                            icon={ArrowTurnBackwardIcon}
+                            strokeWidth={2}
+                          />
+                        </Button>
+                      )
+                    : swapButton}
                 </li>
               )
             })}
           </ul>
-        </div>
+        </section>
       ))}
     </div>
   )

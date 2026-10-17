@@ -1,5 +1,5 @@
-import { HugeiconsIcon } from "@hugeicons/react"
 import { Tick02Icon } from "@hugeicons/core-free-icons"
+import { HugeiconsIcon } from "@hugeicons/react"
 
 import { cn } from "@/lib/utils"
 
@@ -13,7 +13,7 @@ export function SelectMark({
 }) {
   return (
     <span
-      aria-hidden="true"
+      aria-hidden
       className={cn(
         "flex size-6 items-center justify-center rounded-lg border-2 transition-colors",
         picked

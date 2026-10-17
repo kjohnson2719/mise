@@ -1,26 +1,19 @@
-import * as React from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
-  BubbleChatSparkIcon,
   Calendar03Icon,
   CheckmarkCircle02Icon,
   FridgeIcon,
-  Invoice01Icon,
   MoreHorizontalIcon,
+  ReceiptDollarIcon,
   ShoppingBasketAdd01Icon,
-  Store01Icon,
+  SnowIcon,
 } from "@hugeicons/core-free-icons"
-import {
-  DEFAULT_ON_HAND,
-  STORE_SECTIONS,
-  whyUseSoon,
-  type PantryBulkInput,
-  type PantryItem,
-  type UseSoonReason,
-} from "@mise/shared"
-import { Link } from "react-router"
-import { toast } from "sonner"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { addDays } from "@merran/shared"
+import { useQuery } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
+import * as React from "react"
+import { useTranslation } from "react-i18next"
 
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
@@ -45,194 +38,141 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useChat } from "@/features/chat/chat-provider"
+import { useCapability } from "@/features/capabilities/queries"
 import { OnHandDialog } from "@/features/list/list-dialogs"
-import { useAddListItem } from "@/features/list/use-list"
-import { monthDay, shortDayName, today } from "@/features/plan/dates"
-import { AisleDialog } from "@/features/select/aisle-dialog"
+import { onHandQuery } from "@/features/list/queries"
+import { useHouseholdClock } from "@/features/plan/queries"
 import { SelectMark } from "@/features/select/select-mark"
+import { SelectionBar, SelectionHeader } from "@/features/select/selection-bar"
 import {
-  SelectionBar,
-  SelectionHeader,
+  useLongPress,
+  useSelection,
   useSelectionKeepOnly,
-} from "@/features/select/selection-bar"
-import { undoable, useHidden } from "@/features/select/undo"
-import { useLongPress, useSelection } from "@/features/select/use-selection"
-import { useAiStatus } from "@/features/settings/use-ai"
-import { useHouseholdInfo } from "@/features/settings/use-household"
-import { ApiError } from "@/lib/api"
+  type Selection,
+} from "@/features/select/use-selection"
 import { cn } from "@/lib/utils"
 
-import { EditPantryDialog } from "./edit-pantry-dialog"
-import { labelForUseBy, soonTag, soonWhen, urgency } from "./soon"
-import { UseByDialog } from "./use-by-dialog"
+import { EditPantryDialog, PlaceDialog, UseByDialog } from "./pantry-dialogs"
 import {
-  useAddPantryItem,
-  usePantry,
-  usePantryBulk,
-  useRemovePantryItem,
-} from "./use-pantry"
-
-type Row = { item: PantryItem; soon: UseSoonReason | null }
-
-const things = (n: number) => `${n} ${n === 1 ? "thing" : "things"}`
-
-/** An item's part in select mode. */
-type ItemSelect = {
-  selecting: boolean
-  picked: boolean
-  onToggle: () => void
-  /** A long press on a phone, which starts selecting with this one. */
-  onLongPress: () => void
-}
-
-const SECTION_NAMES = new Map<string, string>(
-  STORE_SECTIONS.map((section) => [section.id, section.name])
-)
+  pantryQuery,
+  STORAGE_PLACES,
+  type PantryItem,
+  type StoragePlace,
+} from "./queries"
+import { WaitingReceipts } from "./receipts/waiting-receipts"
+import { usePantryActions } from "./use-pantry-actions"
+import { missedMeal, urgency, useDayLabel } from "./use-soon"
 
 /**
- * What's at home, one aisle after another, with what to use soon at the top
- * and what's always on hand at the bottom.
+ * What's at home: what to use soon at the top, then the fridge, the
+ * freezer and the cupboard, and what's always on hand.
  */
 export function PantryPage() {
-  const pantry = usePantry()
-  const remove = useRemovePantryItem()
-  const add = useAddPantryItem()
-  const addToList = useAddListItem()
+  const { t } = useTranslation()
+  const pantry = useQuery(pantryQuery)
+  const actions = usePantryActions()
   const [editing, setEditing] = React.useState<PantryItem | null>(null)
   const [onHand, setOnHand] = React.useState(false)
+  const [dialog, setDialog] = React.useState<"place" | "useBy" | null>(null)
+  const dayLabel = useDayLabel()
+  const aiOn = useCapability("ai")
 
-  const now = today()
-  const isHidden = useHidden()
-  const items: Row[] = (pantry.data ?? [])
-    .filter((item) => !isHidden(item.id))
-    .map((item) => ({ item, soon: whyUseSoon(item, now) }))
+  const items = pantry.data?.items ?? []
   const soon = items
-    .filter((row) => row.soon)
-    .sort((a, b) => urgency(a.soon!) - urgency(b.soon!))
-  const sections = STORE_SECTIONS.map((section) => ({
-    ...section,
-    rows: items.filter((row) => row.item.sectionId === section.id),
-  })).filter((section) => section.rows.length)
+    .filter((item) => item.useSoon)
+    .sort((a, b) => urgency(a.useSoon!) - urgency(b.useSoon!))
+  const places = [...STORAGE_PLACES, null].map((place) => ({
+    place,
+    items: items.filter((item) => item.storedIn === place),
+  }))
 
-  function usedUp(item: PantryItem) {
-    remove.mutate(item.id, {
-      onSuccess: () =>
-        toast(`Used up: ${item.name}`, {
-          action: {
-            label: "Undo",
-            onClick: () =>
-              add.mutate([item.amount, item.name].filter(Boolean).join(" ")),
-          },
-        }),
-      onError: failed,
-    })
-  }
-
-  function toList(name: string) {
-    addToList.mutate(name, {
-      onSuccess: () => toast.success(`Added ${name} to the list`),
-      onError: failed,
-    })
-  }
-
-  // Select mode, over everything at home.
   const selection = useSelection()
-  const bulk = usePantryBulk()
-  const [dialog, setDialog] = React.useState<"aisle" | "useBy" | null>(null)
-  const selectable = items.map((row) => row.item.id)
+  const selectable = items.map((item) => item.id)
   useSelectionKeepOnly(selection, selectable)
-  const pickedIds = selectable.filter((id) => selection.isPicked(id))
-  const selectOf = (id: string): ItemSelect => ({
-    selecting: selection.selecting,
-    picked: selection.isPicked(id),
-    onToggle: () => selection.toggle(id),
-    onLongPress: () => selection.start(id),
-  })
+  const picked = selectable.filter((id) => selection.isPicked(id))
 
-  /** Out of the pantry, with Undo. */
-  function removeWithUndo(ids: string[], message: string) {
-    undoable({
-      message,
-      ids,
-      commit: () => bulk.mutateAsync({ action: "delete", ids }),
-    })
-  }
-
-  function run(input: PantryBulkInput, said: (changed: number) => string) {
+  const bulk = async (
+    action: Parameters<typeof actions.bulk>[1],
+    said: (count: number) => string
+  ) => {
     setDialog(null)
-    bulk.mutate(input, {
-      onSuccess: ({ changed }) => {
-        toast.success(said(changed))
-        selection.done()
-      },
-      onError: failed,
-    })
+    if (await actions.bulk(picked, action, said)) selection.done()
   }
 
-  const count = items.length
   return (
     <>
       <PageHeader
-        title="Pantry"
+        title={t("pantry.title")}
         description={
-          count
-            ? `${count} ${count === 1 ? "thing" : "things"} at home${soon.length ? `, ${soon.length} to use soon` : ""}`
-            : "What's on hand, and what to use soon."
+          items.length === 0
+            ? t("pantry.empty")
+            : soon.length > 0
+              ? t("pantry.atHomeSoon", {
+                  things: t("pantry.atHome", { count: items.length }),
+                  soon: soon.length,
+                })
+              : t("pantry.atHome", { count: items.length })
         }
         actions={
           selection.selecting ? (
             <SelectionHeader selection={selection} allIds={selectable} />
           ) : (
-            <>
-              <Button variant="outline" asChild>
-                <Link to="/pantry/receipt">
+            <div className="flex gap-2">
+              {aiOn && (
+                <Button
+                  variant="outline"
+                  aria-label={t("pantry.receipts.scan")}
+                  render={<Link to="/pantry/receipts" />}
+                >
                   <HugeiconsIcon
-                    icon={Invoice01Icon}
+                    icon={ReceiptDollarIcon}
                     strokeWidth={2}
                     data-icon="inline-start"
                   />
-                  Scan a receipt
-                </Link>
-              </Button>
+                  <span className="hidden sm:inline">
+                    {t("pantry.receipts.scan")}
+                  </span>
+                </Button>
+              )}
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    aria-label="More pantry options"
-                  >
-                    <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={2} />
-                  </Button>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label={t("pantry.more")}
+                    />
+                  }
+                >
+                  <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={2} />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuItem
-                    disabled={!count}
-                    onSelect={() => selection.start()}
+                    disabled={items.length === 0}
+                    onClick={() => selection.start()}
                   >
-                    Select
+                    {t("pantry.select")}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setOnHand(true)}>
-                    Always on hand
+                  <DropdownMenuItem onClick={() => setOnHand(true)}>
+                    {t("pantry.onHand")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
-                    disabled={!count}
-                    onSelect={() =>
-                      removeWithUndo(selectable, "Cleared the pantry")
-                    }
+                    disabled={items.length === 0}
+                    onClick={() => void actions.clear()}
                   >
-                    Clear the pantry
+                    {t("pantry.clear")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </>
+            </div>
           )
         }
       />
 
       <div className="grid gap-6">
+        <WaitingReceipts />
         <QuickAdd />
 
         {pantry.isPending ? (
@@ -240,178 +180,151 @@ export function PantryPage() {
             <Skeleton className="h-32 rounded-3xl" />
             <Skeleton className="h-48 rounded-3xl" />
           </div>
-        ) : pantry.isError ? (
-          <p className="text-muted-foreground">Couldn't load the pantry.</p>
-        ) : !count ? (
-          <Empty className="border border-dashed">
+        ) : items.length === 0 ? (
+          <Empty className="rounded-3xl border border-dashed">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <HugeiconsIcon icon={FridgeIcon} strokeWidth={2} />
               </EmptyMedia>
-              <EmptyTitle>Nothing in the pantry yet</EmptyTitle>
-              <EmptyDescription>
-                Tap Put away on the List after shopping and everything you
-                bought lands here. Or type what you already have above.
-              </EmptyDescription>
+              <EmptyTitle>{t("pantry.nothing")}</EmptyTitle>
+              <EmptyDescription>{t("pantry.nothingHint")}</EmptyDescription>
             </EmptyHeader>
           </Empty>
         ) : (
           <>
             {soon.length > 0 && (
-              <UseSoon
-                rows={soon}
-                onOpen={(item) => setEditing(item)}
-                selectOf={selectOf}
-                onToss={(ids) =>
-                  removeWithUndo(
-                    ids,
-                    ids.length === 1
-                      ? "Tossed the one past its date"
-                      : `Tossed ${ids.length} things past their date`
-                  )
-                }
+              <UseSoonCard
+                items={soon}
+                selection={selection}
+                onOpen={setEditing}
+                dayLabel={dayLabel}
               />
             )}
-            {sections.length > 2 && <JumpTo sections={sections} />}
-            {sections.map((section) => (
-              <section
-                key={section.id}
-                id={`aisle-${section.id}`}
-                aria-labelledby={`aisle-${section.id}-title`}
-                className="@container scroll-mt-20 rounded-3xl border bg-card px-5 text-card-foreground md:px-6"
-              >
-                <h2
-                  id={`aisle-${section.id}-title`}
-                  className="flex items-baseline gap-2 pt-4 pb-3 text-lg font-semibold tracking-tight"
+            {places
+              .filter((group) => group.items.length > 0)
+              .map((group) => (
+                <section
+                  key={group.place ?? "none"}
+                  aria-labelledby={`place-${group.place ?? "none"}`}
+                  className="@container rounded-3xl border bg-card px-5 text-card-foreground md:px-6"
                 >
-                  {section.name}
-                  <span className="font-sans text-sm font-normal text-muted-foreground">
-                    {section.rows.length}
-                  </span>
-                </h2>
-                <ul className="divide-y border-t">
-                  {section.rows.map(({ item, soon }) => (
-                    <PantryRow
-                      key={item.id}
-                      item={item}
-                      soon={soon}
-                      onEdit={() => setEditing(item)}
-                      onUsedUp={() => usedUp(item)}
-                      onToList={() => toList(item.name)}
-                      select={selectOf(item.id)}
-                    />
-                  ))}
-                </ul>
-              </section>
-            ))}
+                  <h2
+                    id={`place-${group.place ?? "none"}`}
+                    className="flex items-baseline gap-2 pt-4 pb-3 text-lg font-semibold tracking-tight"
+                  >
+                    {t(`pantry.places.${group.place ?? "none"}`)}
+                    <span className="font-sans text-sm font-normal text-muted-foreground">
+                      {group.items.length}
+                    </span>
+                  </h2>
+                  <ul className="divide-y border-t">
+                    {group.items.map((item) => (
+                      <PantryRow
+                        key={item.id}
+                        item={item}
+                        selection={selection}
+                        dayLabel={dayLabel}
+                        onEdit={() => setEditing(item)}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              ))}
           </>
         )}
 
-        <AlwaysOnHand onEdit={() => setOnHand(true)} onLow={toList} />
+        <AlwaysOnHand onEdit={() => setOnHand(true)} />
       </div>
 
       <SelectionBar
         selection={selection}
         actions={[
           {
-            label: "Used up",
+            label: t("pantry.bulk.usedUp"),
             icon: CheckmarkCircle02Icon,
-            onSelect: () => {
-              removeWithUndo(pickedIds, `Used up ${things(pickedIds.length)}`)
-              selection.done()
-            },
-          },
-          {
-            label: "Add to list",
-            icon: ShoppingBasketAdd01Icon,
             onSelect: () =>
-              run({ action: "toList", ids: pickedIds }, (changed) =>
-                changed
-                  ? `Added ${things(changed)} to the list`
-                  : "They're on the list already"
+              void bulk({ action: "remove" }, (count) =>
+                t("pantry.bulk.usedUpDone", { count })
               ),
           },
           {
-            label: "Aisle",
-            icon: Store01Icon,
-            onSelect: () => setDialog("aisle"),
+            label: t("pantry.bulk.toList"),
+            icon: ShoppingBasketAdd01Icon,
+            onSelect: () => {
+              const names = items
+                .filter((item) => picked.includes(item.id))
+                .map((item) => item.name)
+              void actions.toList(names).then((done) => {
+                if (done) selection.done()
+              })
+            },
           },
           {
-            label: "Use by",
+            label: t("pantry.bulk.storedIn"),
+            icon: SnowIcon,
+            onSelect: () => setDialog("place"),
+          },
+          {
+            label: t("pantry.bulk.useBy"),
             icon: Calendar03Icon,
             onSelect: () => setDialog("useBy"),
           },
         ]}
       />
-      <AisleDialog
-        count={pickedIds.length}
-        open={dialog === "aisle"}
-        onOpenChange={(open) => setDialog(open ? "aisle" : null)}
-        onPick={(sectionId) =>
-          run(
-            { action: "aisle", ids: pickedIds, sectionId },
-            (changed) =>
-              `Moved ${things(changed)} to ${SECTION_NAMES.get(sectionId)}`
+      <PlaceDialog
+        count={picked.length}
+        open={dialog === "place"}
+        onOpenChange={(open) => setDialog(open ? "place" : null)}
+        onPick={(place) =>
+          void bulk({ action: "storedIn", storedIn: place }, (count) =>
+            t("pantry.bulk.moved", {
+              count,
+              place: t(`pantry.places.${place}`).toLowerCase(),
+            })
           )
         }
       />
       <UseByDialog
-        count={pickedIds.length}
+        count={picked.length}
         open={dialog === "useBy"}
         onOpenChange={(open) => setDialog(open ? "useBy" : null)}
         onPick={(useBy) =>
-          run({ action: "useBy", ids: pickedIds, useBy }, (changed) =>
+          void bulk({ action: "useBy", useBy }, (count) =>
             useBy
-              ? `${things(changed)} to use by ${monthDay(useBy)}`
-              : `Took the date off ${things(changed)}`
+              ? t("pantry.bulk.dated", { count, day: dayLabel(useBy, true) })
+              : t("pantry.bulk.undated", { count })
           )
         }
       />
-      <EditPantryDialog
-        item={editing}
-        onClose={() => setEditing(null)}
-        onUsedUp={usedUp}
-      />
+      <EditPantryDialog item={editing} onClose={() => setEditing(null)} />
       <OnHandDialog open={onHand} onOpenChange={setOnHand} />
     </>
   )
 }
 
-function failed(error: unknown) {
-  toast.error(error instanceof ApiError ? error.message : "Couldn't save that")
-}
-
-/** Planned meals still to come that an item was bought for. */
-function upcomingMeals(item: PantryItem) {
-  const now = today()
+/** Planned meals still to come that something was set aside for. */
+function upcoming(item: PantryItem, today: string) {
   return item.meals.filter(
-    (meal) => meal.status === "planned" && meal.date >= now
+    (meal) => meal.status === "planned" && meal.date >= today
   )
 }
 
-/** Food to cook before it turns, most urgent first, with a way to ask for ideas. */
-function UseSoon({
-  rows,
+/** Food to cook before it turns, most urgent first. */
+function UseSoonCard({
+  items,
+  selection,
   onOpen,
-  selectOf,
-  onToss,
+  dayLabel,
 }: {
-  rows: Row[]
+  items: PantryItem[]
+  selection: Selection
   onOpen: (item: PantryItem) => void
-  /** While selecting, a card picks its item instead of opening it. */
-  selectOf: (id: string) => ItemSelect
-  /** Throws out what's past its date. */
-  onToss: (ids: string[]) => void
+  dayLabel: (day: string, inSentence?: boolean) => string
 }) {
-  const chat = useChat()
-  const ai = useAiStatus()
-  const past = rows.filter((row) => row.soon?.kind === "past")
-  const selecting = rows.length > 0 && selectOf(rows[0]!.item.id).selecting
-  const names = rows.map(({ item }) => item.name.toLowerCase())
-  const listed =
-    names.length > 1
-      ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`
-      : names[0]
+  const { t } = useTranslation()
+  const actions = usePantryActions()
+  const { today } = useHouseholdClock()
+  const past = items.filter((item) => item.useSoon?.kind === "past")
 
   return (
     <section
@@ -421,84 +334,74 @@ function UseSoon({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="grid gap-0.5">
           <h2 id="use-soon" className="text-xl font-semibold tracking-tight">
-            Use soon
+            {t("pantry.soon.title")}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {rows.length === 1
-              ? "One thing to cook before it turns."
-              : `${rows.length} things to cook before they turn.`}
+            {t("pantry.soon.count", { count: items.length })}
           </p>
         </div>
-        {!selecting && (
-          <div className="flex flex-wrap gap-2">
-            {past.length > 0 && (
-              <Button
-                variant="outline"
-                className="bg-card"
-                onClick={() => onToss(past.map((row) => row.item.id))}
-              >
-                {past.length === 1
-                  ? "Toss the one past its date"
-                  : `Toss the ${past.length} past their date`}
-              </Button>
-            )}
-            {ai.data?.available && (
-              <Button
-                onClick={() =>
-                  chat.ask(
-                    `What can I cook in the next few days to use up the ${listed}?`
-                  )
-                }
-              >
-                <HugeiconsIcon
-                  icon={BubbleChatSparkIcon}
-                  strokeWidth={2}
-                  data-icon="inline-start"
-                />
-                Ideas for these
-              </Button>
-            )}
-          </div>
+        {!selection.selecting && past.length > 0 && (
+          <Button
+            variant="outline"
+            className="bg-card"
+            onClick={() =>
+              void actions.bulk(
+                past.map((item) => item.id),
+                { action: "remove" },
+                (count) => t("pantry.soon.tossed", { count })
+              )
+            }
+          >
+            {t("pantry.soon.toss", { count: past.length })}
+          </Button>
         )}
       </div>
       {/* A row to swipe through on phones; a grid when there's room. */}
       <ul className="-mx-5 flex snap-x gap-2 overflow-x-auto px-5 pb-1 md:mx-0 md:grid md:grid-cols-3 md:overflow-visible md:px-0 md:pb-0 lg:grid-cols-4">
-        {rows.map(({ item, soon }) => {
-          const meal = upcomingMeals(item)[0]
+        {items.map((item) => {
+          const soon = item.useSoon!
+          const when =
+            soon.kind === "past"
+              ? t("pantry.soon.pastWhen")
+              : soon.kind === "leftover"
+                ? t("pantry.soon.leftoverWhen")
+                : dayLabel(soon.date)
+          const meal = upcoming(item, today)[0]
+          const missed = missedMeal(item, today)
           const detail =
-            soon!.kind === "leftover"
-              ? `Bought for ${soon!.meals[0]!.name}`
+            soon.kind === "leftover" && missed
+              ? t("pantry.soon.boughtFor", { name: missed.name })
               : meal
-                ? `For ${meal.name} · ${shortDayName(meal.date)}`
-                : [item.amount, SECTION_NAMES.get(item.sectionId)]
-                    .filter(Boolean)
-                    .join(" · ")
+                ? t("pantry.tags.for", {
+                    name: meal.name,
+                    day: dayLabel(meal.date),
+                  })
+                : item.amount
           const urgent =
-            soon!.kind === "past" ||
-            (soon!.kind === "soon" &&
-              (soonWhen(soon!) === "Today" || soonWhen(soon!) === "Tomorrow"))
-          const select = selectOf(item.id)
+            soon.kind === "past" ||
+            (soon.kind === "soon" && soon.date <= addDays(today, 1))
+          const picked = selection.isPicked(item.id)
           return (
             <li key={item.id} className="w-40 shrink-0 snap-start md:w-auto">
               <button
                 type="button"
                 onClick={() =>
-                  select.selecting ? select.onToggle() : onOpen(item)
+                  selection.selecting ? selection.toggle(item.id) : onOpen(item)
                 }
-                aria-pressed={select.selecting ? select.picked : undefined}
+                aria-pressed={selection.selecting ? picked : undefined}
                 className={cn(
                   "grid h-full w-full content-start gap-0.5 rounded-2xl bg-card px-3.5 py-3 text-left text-card-foreground transition-colors outline-none hover:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50",
-                  select.picked && "ring-2 ring-primary"
+                  picked && "ring-2 ring-primary"
                 )}
               >
                 <span
                   className={cn(
                     "text-xs font-semibold tracking-wide text-muted-foreground uppercase",
                     urgent && "text-amber-700 dark:text-amber-400",
-                    soon!.kind === "past" && "text-destructive"
+                    soon.kind === "past" && "text-destructive"
                   )}
                 >
-                  {soonWhen(soon!)}
+                  {when}
                 </span>
                 <span className="truncate font-semibold first-letter:uppercase">
                   {item.name}
@@ -517,42 +420,6 @@ function UseSoon({
   )
 }
 
-/** Buttons that scroll to each aisle, for a long pantry. */
-function JumpTo({
-  sections,
-}: {
-  sections: { id: string; name: string; rows: Row[] }[]
-}) {
-  function jump(id: string) {
-    const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    document
-      .getElementById(`aisle-${id}`)
-      ?.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" })
-  }
-  return (
-    <nav
-      aria-label="Aisles"
-      className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:px-0"
-    >
-      <span className="mr-1 hidden text-sm text-muted-foreground md:inline">
-        Jump to
-      </span>
-      {sections.map((section) => (
-        <Button
-          key={section.id}
-          variant="outline"
-          size="sm"
-          className="shrink-0 rounded-full"
-          onClick={() => jump(section.id)}
-        >
-          {section.name}
-          <span className="text-muted-foreground">{section.rows.length}</span>
-        </Button>
-      ))}
-    </nav>
-  )
-}
-
 type Tag = { text: string; tone: "meal" | "soon" | "past" | "plain" }
 
 const TAG_TONES: Record<Tag["tone"], string> = {
@@ -562,67 +429,84 @@ const TAG_TONES: Record<Tag["tone"], string> = {
   plain: "bg-secondary text-muted-foreground",
 }
 
-/** What's worth knowing about an item: the meals it's for, and when to use it by. */
-function tagsFor(item: PantryItem, soon: UseSoonReason | null): Tag[] {
-  const tags: Tag[] = upcomingMeals(item)
-    .slice(0, 2)
-    .map((meal) => ({
-      text: `For ${meal.name} · ${shortDayName(meal.date)}`,
-      tone: "meal",
-    }))
-  if (soon) {
-    tags.push({
-      text: soonTag(soon),
-      tone: soon.kind === "past" ? "past" : "soon",
-    })
-  } else if (item.useBy) {
-    tags.push({ text: labelForUseBy(item.useBy), tone: "plain" })
-  }
-  return tags
-}
-
+/**
+ * Something at home: its name and how much (tap to change it), what it's
+ * for and when to use it by, and Used up. A long press starts selecting.
+ */
 function PantryRow({
   item,
-  soon,
+  selection,
+  dayLabel,
   onEdit,
-  onUsedUp,
-  onToList,
-  select,
 }: {
   item: PantryItem
-  soon: UseSoonReason | null
+  selection: Selection
+  dayLabel: (day: string, inSentence?: boolean) => string
   onEdit: () => void
-  onUsedUp: () => void
-  onToList: () => void
-  select?: ItemSelect
 }) {
-  const tags = tagsFor(item, soon)
-  const selecting = select?.selecting ?? false
-  const press = useLongPress(
-    () => select?.onLongPress(),
-    Boolean(select && !selecting)
-  )
-  // A narrow card: tags under the name. A wide one: name, tags, then buttons in a line.
+  const { t } = useTranslation()
+  const actions = usePantryActions()
+  const { today } = useHouseholdClock()
+  const selecting = selection.selecting
+  const picked = selection.isPicked(item.id)
+  const press = useLongPress(() => selection.start(item.id), !selecting)
+
+  const tags: Tag[] = upcoming(item, today)
+    .slice(0, 2)
+    .map((meal) => ({
+      text: t("pantry.tags.for", {
+        name: meal.name,
+        day: dayLabel(meal.date, true),
+      }),
+      tone: "meal",
+    }))
+  const soon = item.useSoon
+  if (soon?.kind === "past")
+    tags.push({ text: t("pantry.tags.past"), tone: "past" })
+  else if (soon?.kind === "soon")
+    tags.push({
+      text: t("pantry.tags.useBy", { day: dayLabel(soon.date, true) }),
+      tone: "soon",
+    })
+  else if (soon?.kind === "leftover") {
+    const missed = missedMeal(item, today)
+    if (missed)
+      tags.push({
+        text:
+          missed.status === "skipped"
+            ? t("pantry.tags.leftoverSkipped", { name: missed.name })
+            : t("pantry.tags.leftover", { name: missed.name }),
+        tone: "soon",
+      })
+  } else if (item.useBy)
+    tags.push({
+      text: t("pantry.tags.useBy", { day: dayLabel(item.useBy, true) }),
+      tone: "plain",
+    })
+
+  const elsewhere = STORAGE_PLACES.filter((place) => place !== item.storedIn)
+
+  // A narrow card: tags under the name. A wide one: all in a line.
   return (
     <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 py-3 @3xl:grid-cols-[minmax(0,1fr)_auto_auto] @3xl:gap-x-4">
       <button
         type="button"
-        onClick={selecting ? select?.onToggle : onEdit}
+        onClick={selecting ? () => selection.toggle(item.id) : onEdit}
         {...(selecting ? {} : press)}
+        aria-pressed={selecting ? picked : undefined}
+        aria-label={
+          selecting
+            ? picked
+              ? t("select.unpick", { name: item.name })
+              : t("select.pick", { name: item.name })
+            : t("pantry.editItem.title", { name: item.name })
+        }
         className={cn(
           "col-start-1 row-start-1 flex min-w-0 items-baseline gap-1.5 rounded-md text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
           selecting && "items-center gap-3"
         )}
-        aria-pressed={selecting ? select?.picked : undefined}
-        aria-label={
-          selecting
-            ? `${select?.picked ? "Unselect" : "Select"} ${item.name}`
-            : `Edit ${item.name}`
-        }
       >
-        {selecting && (
-          <SelectMark picked={select?.picked ?? false} className="shrink-0" />
-        )}
+        {selecting && <SelectMark picked={picked} className="shrink-0" />}
         <span className="truncate font-medium first-letter:uppercase">
           {item.name}
         </span>
@@ -658,42 +542,57 @@ function PantryRow({
           variant="outline"
           size="sm"
           className="rounded-full"
-          onClick={onUsedUp}
-          aria-label={`Used up ${item.name}`}
+          onClick={() => void actions.remove(item)}
+          aria-label={t("pantry.usedUpName", { name: item.name })}
         >
-          Used up
+          {t("pantry.usedUp")}
         </Button>
         <Button
           variant="secondary"
           size="sm"
           className="hidden rounded-full sm:inline-flex"
-          onClick={onToList}
-          aria-label={`Add ${item.name} to the list`}
+          onClick={() => void actions.toList([item.name])}
+          aria-label={t("pantry.toListName", { name: item.name })}
         >
           <HugeiconsIcon
             icon={ShoppingBasketAdd01Icon}
             strokeWidth={2}
             data-icon="inline-start"
           />
-          List
+          {t("pantry.toList")}
         </Button>
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="rounded-full"
-              aria-label={`Options for ${item.name}`}
-            >
-              <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={2} />
-            </Button>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="rounded-full"
+                aria-label={t("pantry.options", { name: item.name })}
+              />
+            }
+          >
+            <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={2} />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onSelect={onEdit}>Edit</DropdownMenuItem>
-            <DropdownMenuItem onSelect={onToList}>
-              <HugeiconsIcon icon={ShoppingBasketAdd01Icon} strokeWidth={2} />
-              Add to the list
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={onEdit}>
+              {t("pantry.edit")}
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void actions.toList([item.name])}>
+              <HugeiconsIcon icon={ShoppingBasketAdd01Icon} strokeWidth={2} />
+              {t("pantry.toListName", { name: item.name })}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            {elsewhere.map((place: StoragePlace) => (
+              <DropdownMenuItem
+                key={place}
+                onClick={() => void actions.change(item, { storedIn: place })}
+              >
+                {t("pantry.moveTo", {
+                  place: t(`pantry.places.${place}`).toLowerCase(),
+                })}
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -701,16 +600,11 @@ function PantryRow({
   )
 }
 
-/** Things assumed to be at home. Tapping one when it runs low adds it to the list. */
-function AlwaysOnHand({
-  onEdit,
-  onLow,
-}: {
-  onEdit: () => void
-  onLow: (name: string) => void
-}) {
-  const household = useHouseholdInfo()
-  const onHand = household.data?.onHand ?? DEFAULT_ON_HAND
+/** Things assumed to be at home: tap one running low to put it on the list. */
+function AlwaysOnHand({ onEdit }: { onEdit: () => void }) {
+  const { t } = useTranslation()
+  const actions = usePantryActions()
+  const { data, isPending } = useQuery(onHandQuery)
   return (
     <section
       aria-labelledby="on-hand"
@@ -719,10 +613,10 @@ function AlwaysOnHand({
       <div className="flex items-start justify-between gap-3">
         <div className="grid gap-0.5">
           <h2 id="on-hand" className="text-lg font-semibold tracking-tight">
-            Always on hand
+            {t("pantry.onHand")}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Left off lists made from the plan.
+            {t("pantry.onHandHint")}
           </p>
         </div>
         <Button
@@ -731,21 +625,21 @@ function AlwaysOnHand({
           className="rounded-full bg-card"
           onClick={onEdit}
         >
-          Edit
+          {t("pantry.onHandEdit")}
         </Button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        {household.isPending ? (
+        {isPending ? (
           <Skeleton className="h-8 w-48 rounded-full" />
         ) : (
-          onHand.map((name) => (
+          (data?.items ?? []).map((name) => (
             <Button
               key={name}
               variant="outline"
               size="sm"
               className="rounded-full bg-card"
-              aria-label={`Running low on ${name}: add it to the list`}
-              onClick={() => onLow(name)}
+              aria-label={t("pantry.lowName", { name })}
+              onClick={() => void actions.toList([name])}
             >
               <span className="first-letter:uppercase">{name}</span>
               <HugeiconsIcon
@@ -758,32 +652,38 @@ function AlwaysOnHand({
           ))
         )}
         <span className="ml-1 text-sm text-muted-foreground">
-          Running low? Tap one to add it to the list.
+          {t("pantry.lowOnHand")}
         </span>
       </div>
     </section>
   )
 }
 
+/** Type something in: "2 cans black beans" or "rice". */
 function QuickAdd() {
-  const add = useAddPantryItem()
+  const { t } = useTranslation()
+  const actions = usePantryActions()
   const [text, setText] = React.useState("")
+  const [busy, setBusy] = React.useState(false)
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault()
-        if (!text.trim()) return
-        add.mutate(text.trim(), {
-          onSuccess: () => setText(""),
-          onError: failed,
+        const typed = text.trim()
+        if (!typed) return
+        setBusy(true)
+        void actions.add({ text: typed }).then((added) => {
+          setBusy(false)
+          if (added) setText("")
         })
       }}
     >
       <InputGroup>
         <InputGroupInput
-          placeholder="Add something, like “2 cans black beans” or “rice”"
-          aria-label="Add to the pantry"
+          placeholder={t("pantry.add")}
+          aria-label={t("pantry.addLabel")}
           enterKeyHint="done"
+          maxLength={200}
           value={text}
           onChange={(event) => setText(event.target.value)}
         />
@@ -792,8 +692,8 @@ function QuickAdd() {
             type="submit"
             size="icon-xs"
             variant="default"
-            aria-label="Add"
-            disabled={!text.trim() || add.isPending}
+            aria-label={t("pantry.addButton")}
+            disabled={!text.trim() || busy}
           >
             <HugeiconsIcon icon={Add01Icon} strokeWidth={2} />
           </InputGroupButton>

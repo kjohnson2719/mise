@@ -5,8 +5,8 @@ import { ThemeContext, type Mode } from "./theme-context"
 
 // These keys are also read by the inline script in index.html, which applies
 // the theme before React loads so the page never flashes the wrong colors.
-const MODE_KEY = "mise-mode"
-const PALETTE_KEY = "mise-palette"
+const MODE_KEY = "merran-mode"
+const PALETTE_KEY = "merran-palette"
 const MODES: readonly Mode[] = ["light", "dark", "system"]
 const DARK_QUERY = "(prefers-color-scheme: dark)"
 

@@ -6,14 +6,14 @@ import {
   ShoppingBasket01Icon,
 } from "@hugeicons/core-free-icons"
 
-/** Main sections, shown in the sidebar (iPad/desktop) and bottom tabs (phone). */
+/** The main sections: the sidebar on iPad and desktop, the bottom tabs on phones. */
 export const PRIMARY_NAV = [
-  { to: "/", label: "Today", icon: Home01Icon },
-  { to: "/recipes", label: "Recipes", icon: CookBookIcon },
-  { to: "/plan", label: "Plan", icon: Calendar03Icon },
-  { to: "/list", label: "List", icon: ShoppingBasket01Icon },
-  { to: "/pantry", label: "Pantry", icon: FridgeIcon },
-]
+  { to: "/", labelKey: "nav.today", icon: Home01Icon },
+  { to: "/recipes", labelKey: "nav.recipes", icon: CookBookIcon },
+  { to: "/plan", labelKey: "nav.plan", icon: Calendar03Icon },
+  { to: "/list", labelKey: "nav.list", icon: ShoppingBasket01Icon },
+  { to: "/pantry", labelKey: "nav.pantry", icon: FridgeIcon },
+] as const
 
 /** Whether a section is the one open; "/" only on the home page itself. */
 export function isSectionActive(to: string, pathname: string) {

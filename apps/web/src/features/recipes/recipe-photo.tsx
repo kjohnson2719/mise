@@ -1,129 +1,205 @@
-import * as React from "react"
+import { AiMagicIcon, ImageAdd02Icon } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { SparklesIcon } from "@hugeicons/core-free-icons"
-import type { Recipe } from "@mise/shared"
-import { useIsMutating, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQueryClient } from "@tanstack/react-query"
+import * as React from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
-import { useAiStatus } from "@/features/settings/use-ai"
-import { api, ApiError } from "@/lib/api"
+import { api, ApiError, unwrap } from "@/lib/api/client"
+import { cn } from "@/lib/utils"
 
-import { RecipeImage } from "./recipe-image"
-import { photoMutationKey, useRecipePhoto } from "./use-recipes"
+import { useAiPhotos } from "./ai-photos"
+import { recipeQuery, useRefreshRecipes, type Recipe } from "./queries"
 
-/** A recipe this new may have a photo being made for it in the background. */
-const NEW_RECIPE_MS = 2 * 60_000
+/** Photos people can pick: what browsers show and Merran can read. */
+const ACCEPT = "image/jpeg,image/png,image/webp,image/gif,image/avif"
 
 /**
- * Making a photo with AI: for a recipe without one, or another go at an AI
- * one. Null when the server can't make photos (no OpenAI key).
+ * Adding, changing and taking away a recipe's photo. `choose` opens the
+ * file picker; `input` is the hidden picker to render once.
  */
-export function useMakePhoto(recipe: Recipe) {
-  const ai = useAiStatus()
-  const photo = useRecipePhoto(recipe.id)
-  const making = useIsMutating({ mutationKey: photoMutationKey(recipe.id) }) > 0
-  const can = Boolean(ai.data?.images) && (!recipe.imageUrl || recipe.photoByAi)
+export function usePhotoActions(recipe: Recipe) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const refresh = useRefreshRecipes()
+  const picker = React.useRef<HTMLInputElement>(null)
+  const [busy, setBusy] = React.useState(false)
+  const [making, setMaking] = React.useState(false)
+  const aiPhotos = useAiPhotos()
 
-  function make() {
-    photo.generate.mutate(undefined, {
-      onSuccess: () => toast.success("Here's a photo for it"),
-      onError: (error) =>
-        toast.error(
-          error instanceof ApiError ? error.message : "Couldn't make a photo"
-        ),
-    })
+  async function run(work: () => Promise<Recipe>, done: string) {
+    setBusy(true)
+    try {
+      queryClient.setQueryData(recipeQuery(recipe.slug).queryKey, await work())
+      await refresh()
+      toast.success(done)
+    } catch (error) {
+      if (!(error instanceof ApiError)) throw error
+      toast.error(error.message)
+    } finally {
+      setBusy(false)
+    }
   }
-  return { can, making, make }
+
+  const upload = (file: File) =>
+    run(
+      () =>
+        unwrap(
+          api.PUT("/api/recipes/{recipe}/photo", {
+            params: { path: { recipe: recipe.id } },
+            // The photo itself is the body, not JSON.
+            body: file as unknown as string,
+            bodySerializer: (body) => body as unknown as BodyInit,
+            headers: { "content-type": file.type || "image/jpeg" },
+          })
+        ),
+      recipe.photo ? t("recipes.photo.changed") : t("recipes.photo.added")
+    )
+
+  const remove = () =>
+    run(
+      () =>
+        unwrap(
+          api.DELETE("/api/recipes/{recipe}/photo", {
+            params: { path: { recipe: recipe.id } },
+          })
+        ),
+      t("recipes.photo.removed")
+    )
+
+  /** A photo made by AI, for a recipe without one or in place of an AI one. */
+  async function make() {
+    setMaking(true)
+    await run(
+      () =>
+        unwrap(
+          api.POST("/api/recipes/{recipe}/photo/make", {
+            params: { path: { recipe: recipe.id } },
+          })
+        ),
+      t("recipes.photo.made")
+    )
+    setMaking(false)
+  }
+
+  const input = (
+    <input
+      ref={picker}
+      type="file"
+      accept={ACCEPT}
+      className="hidden"
+      aria-hidden
+      tabIndex={-1}
+      onChange={(event) => {
+        const file = event.target.files?.[0]
+        event.target.value = ""
+        if (file) void upload(file)
+      }}
+    />
+  )
+
+  return {
+    busy,
+    making,
+    /** Whether AI can make it a photo: none yet, or one made by AI. */
+    canMake: aiPhotos && (!recipe.photo || recipe.photoByAi),
+    make: () => void make(),
+    choose: () => picker.current?.click(),
+    remove,
+    input,
+  }
 }
 
-/** The recipe's photo, with a way to make one, and a label on one made by AI. */
-export function RecipePhoto({ recipe }: { recipe: Recipe }) {
-  const ai = useAiStatus()
-  const { can, making, make } = useMakePhoto(recipe)
-  const waiting = useWaitForNewPhoto(recipe, Boolean(ai.data?.autoPhotos))
-  const busy = making || (waiting && !recipe.imageUrl)
+export type PhotoActions = ReturnType<typeof usePhotoActions>
 
+/** The recipe's photo at the top of its page, or a place to add one. */
+export function RecipePhoto({
+  recipe,
+  actions,
+  className,
+}: {
+  recipe: Recipe
+  actions: PhotoActions
+  className?: string
+}) {
+  const { t } = useTranslation()
   return (
-    <div className="relative">
-      <RecipeImage
-        src={recipe.imageUrl}
-        alt={recipe.name}
-        eager
-        className="aspect-[4/3] w-full rounded-3xl"
-      />
-      {recipe.photoByAi && !busy && (
-        <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-xs font-medium text-white backdrop-blur-sm">
-          <HugeiconsIcon
-            icon={SparklesIcon}
-            strokeWidth={2}
-            className="size-3"
-          />
-          AI photo
-        </span>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-3xl bg-muted",
+        // Without a photo, the place to add one stays small on phones.
+        recipe.photo ? "aspect-[4/3]" : "aspect-[5/2] md:aspect-[4/3]",
+        className
       )}
-      {busy ? (
-        <div
-          role="status"
-          className="absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-3xl bg-background/70 text-center backdrop-blur-sm"
-        >
-          <Spinner className="size-6" />
-          <p className="font-medium">Making a photo…</p>
-          <p className="text-sm text-muted-foreground">
-            This takes about half a minute.
-          </p>
-        </div>
-      ) : (
-        can &&
-        !recipe.imageUrl && (
-          <div className="absolute inset-x-0 bottom-0 flex justify-center p-4">
-            <Button variant="secondary" onClick={make}>
+    >
+      {recipe.photo ? (
+        <>
+          <img
+            src={recipe.photo.full}
+            alt={t("recipes.photo.alt", { name: recipe.name })}
+            className="size-full object-cover"
+          />
+          {recipe.photoByAi && (
+            <span className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-background/80 px-2.5 py-1 text-xs font-medium backdrop-blur-sm">
               <HugeiconsIcon
-                icon={SparklesIcon}
+                icon={AiMagicIcon}
+                strokeWidth={2}
+                className="size-3.5"
+              />
+              {t("recipes.photo.byAi")}
+            </span>
+          )}
+        </>
+      ) : (
+        <div className="relative size-full">
+          <button
+            type="button"
+            onClick={actions.choose}
+            disabled={actions.busy}
+            className="flex size-full flex-col items-center justify-center gap-2 rounded-3xl border-2 border-dashed text-muted-foreground transition-colors outline-none hover:border-primary/40 hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <HugeiconsIcon
+              icon={ImageAdd02Icon}
+              strokeWidth={1.5}
+              className="size-8"
+            />
+            <span className="text-sm font-medium">
+              {t("recipes.photo.add")}
+            </span>
+          </button>
+          {actions.canMake && (
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={actions.busy}
+              onClick={actions.make}
+              className="absolute bottom-3 left-1/2 -translate-x-1/2"
+            >
+              <HugeiconsIcon
+                icon={AiMagicIcon}
                 strokeWidth={2}
                 data-icon="inline-start"
               />
-              Make a photo
+              {t("recipes.photo.make")}
             </Button>
-          </div>
-        )
+          )}
+        </div>
+      )}
+      {actions.busy && (
+        <div
+          className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/60"
+          aria-live="polite"
+        >
+          <Spinner className="size-6" />
+          {actions.making && (
+            <span className="text-sm font-medium">
+              {t("recipes.photo.making")}
+            </span>
+          )}
+        </div>
       )}
     </div>
   )
-}
-
-/**
- * Whether the server is making a photo for a recipe just added without one
- * (when it makes photos for new recipes). Asks every few seconds until it's
- * done, then fetches the recipe again for the photo.
- */
-function useWaitForNewPhoto(recipe: Recipe, autoPhotos: boolean) {
-  const queryClient = useQueryClient()
-  const [openedAt] = React.useState(() => Date.now())
-  const isNew =
-    autoPhotos &&
-    !recipe.imageUrl &&
-    openedAt - Date.parse(recipe.createdAt) < NEW_RECIPE_MS
-  const status = useQuery({
-    queryKey: ["recipe-photo-status", recipe.id],
-    queryFn: () => api<{ making: boolean }>(`/recipes/${recipe.id}/photo`),
-    enabled: isNew,
-    refetchInterval: (query) => (query.state.data?.making ? 3000 : false),
-    gcTime: 0,
-  })
-  const making = isNew && status.data?.making === true
-
-  // Done (made, or failed): the recipe, and the library's cards, may have a photo now.
-  const wasMaking = React.useRef(false)
-  React.useEffect(() => {
-    if (wasMaking.current && !making) {
-      queryClient.invalidateQueries({ queryKey: ["recipe", recipe.id] })
-      queryClient.invalidateQueries({ queryKey: ["recipe", recipe.slug] })
-      queryClient.invalidateQueries({ queryKey: ["recipes"] })
-    }
-    wasMaking.current = making
-  }, [making, queryClient, recipe.id, recipe.slug])
-
-  return making
 }

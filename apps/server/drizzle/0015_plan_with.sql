@@ -1,2 +1,0 @@
-ALTER TABLE "meal_plan_entries" ADD COLUMN "with_recipe_id" uuid;--> statement-breakpoint
-ALTER TABLE "meal_plan_entries" ADD CONSTRAINT "meal_plan_entries_with_recipe_id_recipes_id_fk" FOREIGN KEY ("with_recipe_id") REFERENCES "public"."recipes"("id") ON DELETE set null ON UPDATE no action;

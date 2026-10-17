@@ -1,4 +1,4 @@
-import type * as React from "react"
+import * as React from "react"
 
 import {
   Field,
@@ -8,29 +8,29 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 
-/** A labelled input with either a hint or an error underneath. */
+/** A labelled input, with a hint or its error underneath. */
 export function TextField({
-  id,
   label,
-  error,
   description,
-  ...inputProps
-}: {
-  id: string
+  error,
+  id,
+  ...props
+}: React.ComponentProps<typeof Input> & {
   label: string
-  error?: string
   description?: React.ReactNode
-} & React.ComponentProps<typeof Input>) {
-  const invalid = Boolean(error)
+  error?: string
+}) {
+  const fallbackId = React.useId()
+  const inputId = id ?? fallbackId
   return (
-    <Field data-invalid={invalid || undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Input id={id} aria-invalid={invalid || undefined} {...inputProps} />
+    <Field data-invalid={error ? true : undefined}>
+      <FieldLabel htmlFor={inputId}>{label}</FieldLabel>
+      <Input id={inputId} aria-invalid={error ? true : undefined} {...props} />
       {error ? (
         <FieldError>{error}</FieldError>
-      ) : description ? (
-        <FieldDescription>{description}</FieldDescription>
-      ) : null}
+      ) : (
+        description && <FieldDescription>{description}</FieldDescription>
+      )}
     </Field>
   )
 }

@@ -1,20 +1,4 @@
 {
-  "compilerOptions": {
-    "target": "es2024",
-    "lib": ["ES2024"],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "strict": true,
-    "noEmit": true,
-    "skipLibCheck": true,
-
-    /* Consumed as source by Node (type stripping) and by Vite, so: */
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "erasableSyntaxOnly": true,
-
-    "noUnusedLocals": true,
-    "noUnusedParameters": true
-  },
+  "extends": "../../tsconfig.base.json",
   "include": ["src"]
 }

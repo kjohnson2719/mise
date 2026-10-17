@@ -1,61 +1,61 @@
 # syntax=docker/dockerfile:1
 
-# Nourvio: one image that serves the web app and the API.
-# Build it from a checkout (`docker build .`) or straight from GitHub
-# (`docker build https://github.com/Nourvio/nourvio.git#main`).
+# Merran: one image, serving the API and the web app.
+#
+#   docker build -t merran .
+#   docker run -p 3000:3000 -v ./data:/data merran
+#
+# Releases are built by .github/workflows/release.yml, as
+# ghcr.io/merran-app/merran:<version>.
 
-# ---- Build the web app and the browser extension ----
-FROM node:24-slim AS build
+FROM node:24-slim AS base
+ENV PNPM_HOME=/pnpm \
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
 WORKDIR /app
-COPY package.json package-lock.json ./
-COPY apps/web/package.json apps/web/
+
+# ---- The server's production dependencies, and nothing else ----
+FROM base AS deps
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
 COPY apps/server/package.json apps/server/
-COPY apps/extension/package.json apps/extension/
 COPY packages/shared/package.json packages/shared/
-RUN npm ci
-COPY packages/shared packages/shared
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --prod --filter @merran/server
+
+# ---- The web app: static files, so it's built once, on the build machine ----
+FROM --platform=$BUILDPLATFORM node:24-slim AS web
+ENV PNPM_HOME=/pnpm \
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+RUN corepack enable
+WORKDIR /app
+COPY pnpm-workspace.yaml package.json pnpm-lock.yaml ./
+COPY apps/web/package.json apps/web/
+COPY packages/shared/package.json packages/shared/
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --filter @merran/web
+COPY packages/shared/src packages/shared/src
 COPY apps/web apps/web
-RUN npm run build -w @mise/web
-COPY apps/extension apps/extension
-RUN npm run build -w @mise/extension
-
-# ---- Production dependencies for the server only ----
-FROM node:24-slim AS deps
-WORKDIR /app
-COPY package.json package-lock.json ./
-COPY apps/web/package.json apps/web/
-COPY apps/server/package.json apps/server/
-COPY apps/extension/package.json apps/extension/
-COPY packages/shared/package.json packages/shared/
-RUN npm ci --omit=dev --workspace @mise/server --ignore-scripts
-
-# ---- When this build's source was fetched, for "an update is available" ----
-# Copying the whole build context makes the stamp new whenever anything in
-# the image changes; it runs first, right after the source arrives.
-FROM node:24-slim AS stamp
-COPY . /src
-RUN date -u +%Y-%m-%dT%H:%M:%SZ > /built-at
+RUN pnpm --filter @merran/web build
 
 # ---- Runtime ----
 FROM node:24-slim
-ARG MISE_VERSION=dev
 ARG TARGETARCH
 ENV NODE_ENV=production \
     PORT=3000 \
-    DATA_DIR=/data \
-    MISE_VERSION=$MISE_VERSION \
-    YTDLP_PATH=/opt/yt-dlp/yt-dlp
-WORKDIR /app
+    MERRAN_DATA_DIR=/data \
+    MERRAN_INSTALL_METHOD=docker \
+    MERRAN_YTDLP_PATH=/opt/yt-dlp/yt-dlp
 
 # Tools, before the app so this layer stays cached between app updates:
-# - setpriv (util-linux), for the entrypoint to drop root
-# - ffmpeg, for frames and audio from recipe videos. A static build from
-#   BtbN/FFmpeg-Builds (linked from ffmpeg.org): Debian's package and its
-#   libraries would add about 900 MB.
-# - yt-dlp, which reads TikTok, YouTube and Instagram: the standalone nightly
-#   build, which yt-dlp recommends since it keeps up with site changes fastest.
-#   The app keeps it updated (see scheduleYtDlpUpdates), so the entrypoint
-#   hands /opt/yt-dlp to the app user.
+# - setpriv (from util-linux), for the entrypoint to drop root after
+#   setting up the data folder.
+# - ffmpeg, for frames and sound from recipe videos: a static build from
+#   BtbN/FFmpeg-Builds (linked from ffmpeg.org), since Debian's package and
+#   its libraries would add about 900 MB.
+# - yt-dlp, which reads TikTok, YouTube, Instagram and Facebook: the
+#   standalone nightly build, which keeps up with site changes fastest.
+#   Merran keeps it updated (modules/video), so the entrypoint hands
+#   /opt/yt-dlp to the app's user.
 # Both downloads are checked against their releases' checksums.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends util-linux ca-certificates curl xz-utils \
@@ -77,13 +77,21 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/* \
     && command -v setpriv && ffmpeg -version | head -n 1 && /opt/yt-dlp/yt-dlp --version
 
+# The release this is (CI passes it: 0.1.0-alpha.1, or 0.0.0-edge.<commit>),
+# after the tools so a new version doesn't download them again.
+ARG MERRAN_VERSION=0.0.0-dev
+ENV MERRAN_VERSION=$MERRAN_VERSION
+
+WORKDIR /app
 COPY --from=deps /app/node_modules node_modules
-COPY packages/shared packages/shared
-COPY apps/server apps/server
-COPY --from=build /app/apps/web/dist apps/web/dist
-COPY --from=build /app/apps/extension/release apps/extension/release
-COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/mise-entrypoint
-COPY --from=stamp /built-at BUILT_AT
+COPY --from=deps /app/apps/server/node_modules apps/server/node_modules
+COPY packages/shared/package.json packages/shared/
+COPY packages/shared/src packages/shared/src
+COPY apps/server/package.json apps/server/
+COPY apps/server/src apps/server/src
+COPY --from=web /app/apps/web/dist apps/web/dist
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/merran-entrypoint
+COPY --chmod=755 docker/merran.sh /usr/local/bin/merran
 RUN mkdir -p /data
 
 EXPOSE 3000
@@ -91,5 +99,5 @@ VOLUME /data
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:' + (process.env.PORT || 3000) + '/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 
-ENTRYPOINT ["mise-entrypoint"]
+ENTRYPOINT ["merran-entrypoint"]
 CMD ["node", "apps/server/src/index.ts"]

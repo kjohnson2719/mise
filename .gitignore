@@ -2,8 +2,10 @@
 node_modules
 dist
 dist-ssr
-# The packaged browser extension (built with the image)
+# The browser extension's build, its zips, and what WXT makes for TypeScript
 apps/extension/release
+apps/extension/.output
+apps/extension/.wxt
 coverage
 *.tsbuildinfo
 
@@ -12,7 +14,12 @@ coverage
 .env.*
 !.env.example
 *.local
-data/
+# What a running server keeps (its database, files and secret): the data
+# folder at the root, as Docker Compose mounts it, and the dev server's.
+# Not the code's own data folders, like the foods and recipe sites.
+/data/
+apps/server/data/
+apps/REFERENCE/server/data/
 
 # Logs
 logs
@@ -26,3 +33,5 @@ npm-debug.log*
 .DS_Store
 *.suo
 *.sw?
+.tanstack
+.local

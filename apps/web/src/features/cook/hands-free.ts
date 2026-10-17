@@ -1,6 +1,12 @@
+import { forSpeech, parseCookCommand, type CookCommand } from "@merran/shared"
 import * as React from "react"
-import { parseCookCommand, type CookCommand } from "@mise/shared"
 
+import {
+  readAhead,
+  serverReading,
+  SILENCE,
+  useServerVoice,
+} from "./server-voice"
 import { chosenVoice, readingLanguage } from "./voices"
 
 // The Web Speech API isn't in TypeScript's DOM types everywhere, so just
@@ -28,25 +34,24 @@ function recognitionClass(): RecognitionClass | null {
   return speech.SpeechRecognition ?? speech.webkitSpeechRecognition ?? null
 }
 
-/** Whether this browser can listen and speak (Chrome, Edge and Safari can; Firefox can't listen). */
+/** Whether this browser can listen and speak. Chrome, Edge and Safari can; Firefox can't listen. */
 export function handsFreeSupported() {
   return Boolean(recognitionClass()) && "speechSynthesis" in window
 }
 
 /**
- * Listens for cooking commands while on, and reads things aloud. Listening
- * pauses while it speaks, so it doesn't hear itself, and restarts whenever
- * the browser stops it (after a silence, say).
+ * Listens for cooking commands while on, and reads things aloud: in the
+ * server's voice when it reads for the household, else (or when it's slow
+ * or fails) in the device's. Listening pauses while it speaks, so it
+ * doesn't hear itself, and starts again whenever the browser stops it
+ * (after a silence, say).
  */
 export function useHandsFree({
   enabled,
-  serverVoice = false,
   onCommand,
   onDenied,
 }: {
   enabled: boolean
-  /** The server reads aloud (Kokoro or OpenAI) instead of the device's voice. */
-  serverVoice?: boolean
   onCommand: (command: CookCommand) => void
   /** The microphone was refused. */
   onDenied: () => void
@@ -56,71 +61,26 @@ export function useHandsFree({
   const recognition = React.useRef<Recognition | null>(null)
   const speaking = React.useRef(false)
   const enabledRef = React.useRef(enabled)
-  const serverRef = React.useRef(serverVoice)
   const handlers = React.useRef({ onCommand, onDenied })
   React.useEffect(() => {
     enabledRef.current = enabled
-    serverRef.current = serverVoice
     handlers.current = { onCommand, onDenied }
   })
-
-  // The server's voice plays through one AudioContext, which the tap that
-  // turns hands-free on unlocks, so later steps can play by themselves
-  // (phones only allow sound that a tap started).
-  const audio = React.useRef<AudioContext | null>(null)
-  const playing = React.useRef<AudioBufferSourceNode | null>(null)
-  const clips = React.useRef(new Map<string, Promise<AudioBuffer>>())
-  /** Each thing said takes a turn; a newer one cancels the older. */
+  /** Each thing said takes a turn; a newer one cuts off the older. */
   const turn = React.useRef(0)
-  React.useEffect(
-    () => () => {
-      void audio.current?.close().catch(() => {})
-    },
-    []
-  )
+  const serverOn = useServerVoice()
+  /** One player for the server's readings, let play by the first tap. */
+  const player = React.useRef<HTMLAudioElement | null>(null)
 
-  const context = React.useCallback(() => {
-    if (!audio.current) {
-      const Context =
-        window.AudioContext ??
-        (window as unknown as { webkitAudioContext: typeof AudioContext })
-          .webkitAudioContext
-      audio.current = new Context()
+  /** Stops anything being read aloud, by either voice. */
+  const hush = React.useCallback(() => {
+    window.speechSynthesis?.cancel()
+    const playing = player.current
+    if (playing) {
+      playing.onended = null
+      playing.onerror = null
+      playing.pause()
     }
-    return audio.current
-  }, [])
-
-  /** The server's reading of some text, fetched once a visit. */
-  const clip = React.useCallback(
-    (spoken: string) => {
-      let found = clips.current.get(spoken)
-      if (!found) {
-        found = fetch("/api/voice/speak", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({ text: spoken }),
-        })
-          .then((res) => {
-            if (!res.ok) throw new Error(`The server voice said ${res.status}`)
-            return res.arrayBuffer()
-          })
-          .then((data) => context().decodeAudioData(data))
-        found.catch(() => clips.current.delete(spoken))
-        clips.current.set(spoken, found)
-      }
-      return found
-    },
-    [context]
-  )
-
-  const stopClip = React.useCallback(() => {
-    try {
-      playing.current?.stop()
-    } catch {
-      // Not started, or done.
-    }
-    playing.current = null
   }, [])
 
   const listen = React.useCallback(() => {
@@ -135,16 +95,17 @@ export function useHandsFree({
     if (!enabled) return
     const Recognizer = recognitionClass()
     if (!Recognizer) return
+    const language = readingLanguage()
     const recognizer = new Recognizer()
     recognizer.continuous = true
     recognizer.interimResults = false
-    recognizer.lang = navigator.language || "en-US"
+    recognizer.lang = language
     recognizer.onresult = (event) => {
       const result = event.results[event.results.length - 1]
       if (!result?.isFinal) return
       const said = result[0].transcript.trim()
       setHeard(said)
-      const command = parseCookCommand(said)
+      const command = parseCookCommand(said, language)
       if (command) handlers.current.onCommand(command)
     }
     recognizer.onstart = () => setListening(true)
@@ -177,29 +138,26 @@ export function useHandsFree({
       } catch {
         // Already stopped.
       }
-      window.speechSynthesis?.cancel()
-      try {
-        playing.current?.stop()
-      } catch {
-        // Not playing.
-      }
+      hush()
       setListening(false)
       setHeard(null)
     }
-  }, [enabled, listen])
+  }, [enabled, listen, hush])
 
-  /**
-   * Reads text aloud, pausing listening meanwhile: in the server's voice
-   * when there is one (the device's voice fills in if it fails or takes too
-   * long), else the device's.
-   */
+  /** Reads text aloud, not listening meanwhile. */
   const speak = React.useCallback(
     (text: string) => {
       if (!text.trim()) return
-      const spoken = forSpeech(text)
+      const language = readingLanguage()
+      const spoken = forSpeech(text, language)
       const mine = ++turn.current
-      window.speechSynthesis?.cancel()
-      stopClip()
+      hush()
+      // Played from the tap that turns hands-free on, so phones let the
+      // server's readings play later on.
+      if (serverOn && !player.current) {
+        player.current = new Audio(SILENCE)
+        void player.current.play().catch(() => {})
+      }
       speaking.current = true
       try {
         recognition.current?.abort()
@@ -218,109 +176,61 @@ export function useHandsFree({
         speaking.current = false
         if (enabledRef.current) listen()
       }
-      // Some browsers never say they've finished (no voices installed, say):
-      // listen again after about as long as it takes to read.
-      const listenAfter = (ms: number) => {
-        clearTimeout(fallback)
-        fallback = setTimeout(finished, ms)
-      }
-      const onDevice = () => {
-        if (done || turn.current !== mine) return
+      /** In the device's own voice. */
+      const deviceReads = () => {
+        if (turn.current !== mine) return
         if (!("speechSynthesis" in window)) return finished()
-        listenAfter(Math.min(60_000, 1500 + spoken.length * 90))
+        // Some browsers never say they've finished (no voices installed,
+        // say): listen again after about as long as it takes to read.
+        clearTimeout(fallback)
+        fallback = setTimeout(
+          finished,
+          Math.min(60_000, 1500 + spoken.length * 90)
+        )
         const utterance = new SpeechSynthesisUtterance(spoken)
-        // The voice chosen on this device, or the best one it has.
         const voice = chosenVoice()
         if (voice) utterance.voice = voice
-        utterance.lang = voice?.lang ?? readingLanguage()
+        utterance.lang = voice?.lang ?? language
         utterance.onend = finished
         utterance.onerror = finished
         window.speechSynthesis.speak(utterance)
       }
+      if (!serverOn) return deviceReads()
 
-      if (!serverRef.current) return onDevice()
-      const sound = context()
-      // While this may still be the tap that asked, so phones allow it.
-      if (sound.state === "suspended") void sound.resume().catch(() => {})
-      const tooSlow = new Promise<never>((_, reject) =>
-        setTimeout(
-          () => reject(new Error("The server voice took too long")),
-          20_000
+      void serverReading(spoken).then((url) => {
+        if (turn.current !== mine) return
+        const audio = player.current
+        if (!url || !audio) return deviceReads()
+        fallback = setTimeout(
+          finished,
+          Math.min(120_000, 3000 + spoken.length * 120)
         )
-      )
-      Promise.race([clip(spoken), tooSlow])
-        .then((buffer) => {
-          if (done || turn.current !== mine) return
-          const source = sound.createBufferSource()
-          source.buffer = buffer
-          source.connect(sound.destination)
-          source.onended = finished
-          playing.current = source
-          listenAfter(buffer.duration * 1000 + 1500)
-          source.start()
-        })
-        .catch(onDevice)
+        audio.onended = finished
+        audio.onerror = deviceReads
+        audio.src = url
+        void audio.play().catch(deviceReads)
+      })
     },
-    [listen, clip, context, stopClip]
+    [listen, hush, serverOn]
   )
 
-  /** Gets the server's reading of some text ready, so it plays straight away when wanted. */
+  /** Gets the server's reading of what's next ready, while this is read. */
   const prepare = React.useCallback(
     (text: string) => {
-      if (serverRef.current && text.trim()) {
-        clip(forSpeech(text)).catch(() => {})
+      if (serverOn && text.trim()) {
+        readAhead(forSpeech(text, readingLanguage()))
       }
     },
-    [clip]
+    [serverOn]
   )
 
+  /** Stops reading aloud, and listens again if hands-free is still on. */
   const stopSpeaking = React.useCallback(() => {
     turn.current++
-    stopClip()
-    window.speechSynthesis?.cancel()
-  }, [stopClip])
+    hush()
+    speaking.current = false
+    if (enabledRef.current) listen()
+  }, [listen, hush])
 
   return { listening, heard, speak, prepare, stopSpeaking }
-}
-
-const SPOKEN_UNITS: [RegExp, string][] = [
-  [/(\d) ½/g, "$1 and a half"],
-  [/(^|[\s(])½ /g, "$1half a "],
-  [/(^|[\s(])¼ /g, "$1a quarter "],
-  [/(^|[\s(])⅓ /g, "$1a third of a "],
-  [/¾/g, "three quarters"],
-  [/⅔/g, "two thirds"],
-  // One of something, or a fraction of one, is singular.
-  [/\b(1|a) tbsps?\b/gi, "$1 tablespoon"],
-  [/\b(1|a) tsps?\b/gi, "$1 teaspoon"],
-  [/\b(1|a) lbs?\b/gi, "$1 pound"],
-  [/\b(1|a) oz\b/gi, "$1 ounce"],
-  [/\btbsps?\b/gi, "tablespoons"],
-  [/\btsps?\b/gi, "teaspoons"],
-  [/\blbs?\b/gi, "pounds"],
-  [/\boz\b/gi, "ounces"],
-  [/\bkg\b/gi, "kilograms"],
-  [/\bml\b/gi, "milliliters"],
-  [/(\d) ?g\b/g, "$1 grams"],
-]
-
-/** "1 ½ tbsp", "28 g" → "1 and a half tablespoons", "28 grams": easier to follow out loud. */
-export function forSpeech(text: string) {
-  return SPOKEN_UNITS.reduce(
-    (spoken, [pattern, words]) => spoken.replace(pattern, words),
-    text
-  )
-}
-
-/** 600 → "10 minutes", 90 → "90 seconds", for saying out loud. */
-export function spokenDuration(seconds: number) {
-  if (seconds % 3600 === 0) {
-    const hours = seconds / 3600
-    return `${hours} ${hours === 1 ? "hour" : "hours"}`
-  }
-  if (seconds % 60 === 0) {
-    const minutes = seconds / 60
-    return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`
-  }
-  return `${seconds} seconds`
 }

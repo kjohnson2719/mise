@@ -1,170 +1,174 @@
-import * as React from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
 import { Add01Icon, Delete02Icon } from "@hugeicons/core-free-icons"
-import {
-  MAIN_LIST,
-  STORE_SECTIONS,
-  type ShopId,
-  type ShoppingList,
-  type StoreSectionId,
-} from "@mise/shared"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { useQueryClient } from "@tanstack/react-query"
+import * as React from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
-import { ResponsiveDialog } from "@/components/responsive-dialog"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Input } from "@/components/ui/input"
 import { Spinner } from "@/components/ui/spinner"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
-import {
-  useHouseholdInfo,
-  useSaveLists,
-} from "@/features/settings/use-household"
-import { useShopStatus } from "@/features/shop/use-shop"
-import { ApiError } from "@/lib/api"
+import { api, ApiError, unwrap } from "@/lib/api/client"
+
+import { listQuery, type Aisle, type List } from "./queries"
 
 const MAX_LISTS = 10
-const NO_STORE = "none"
 
-/** The household's lists: names, the store each is for, and the aisles that go on it. */
+/** A list as it's being edited: a new one has a key of its own until saved. */
+type Draft = {
+  key: string
+  id: string | null
+  main: boolean
+  name: string
+  aisles: string[]
+}
+
+/**
+ * The household's lists, for its admins: any names (Festival, Costco,
+ * the corner shop) and the aisles that go on each. Saved as a whole.
+ * Stores are chosen for each thing, with Find and Send.
+ */
 export function ListsDialog({
   open,
   onOpenChange,
+  lists,
+  aisles,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
+  lists: readonly List[]
+  aisles: readonly Aisle[]
 }) {
-  const household = useHouseholdInfo()
+  const { t } = useTranslation()
   return (
-    <ResponsiveDialog
-      open={open}
-      onOpenChange={onOpenChange}
-      title="Shopping lists"
-      description="A list for each store you shop at. Things go on the main list unless their aisle goes elsewhere, or you've moved them before."
-    >
-      {open && household.data && (
-        <ListsEditor
-          initial={household.data.lists}
-          onDone={() => onOpenChange(false)}
-        />
-      )}
-    </ResponsiveDialog>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{t("list.lists.title")}</DialogTitle>
+          <DialogDescription>{t("list.lists.description")}</DialogDescription>
+        </DialogHeader>
+        {open && (
+          <ListsEditor
+            lists={lists}
+            aisles={aisles}
+            onDone={() => onOpenChange(false)}
+          />
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
 function ListsEditor({
-  initial,
+  lists,
+  aisles,
   onDone,
 }: {
-  initial: ShoppingList[]
+  lists: readonly List[]
+  aisles: readonly Aisle[]
   onDone: () => void
 }) {
-  const save = useSaveLists()
-  const krogerName = useShopStatus().data?.kroger.store?.banner ?? "Kroger"
-  const [lists, setLists] = React.useState(initial)
-  const stores: { id: ShopId; name: string }[] = [
-    { id: "kroger", name: krogerName },
-    { id: "costco", name: "Costco" },
-    { id: "walmart", name: "Walmart" },
-  ]
-
-  const change = (id: string, patch: Partial<ShoppingList>) =>
-    setLists((current) =>
-      current.map((list) => (list.id === id ? { ...list, ...patch } : list))
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+  const [drafts, setDrafts] = React.useState<Draft[]>(() => {
+    const kept = lists.map((list) => ({ key: list.id, ...list }))
+    // Splitting starts with a second list to fill in.
+    return kept.length > 1 ? kept : [...kept, blank()]
+  })
+  const [busy, setBusy] = React.useState(false)
+  const change = (key: string, patch: Partial<Draft>) =>
+    setDrafts((current) =>
+      current.map((draft) =>
+        draft.key === key ? { ...draft, ...patch } : draft
+      )
     )
 
-  function add() {
-    setLists((current) => [
-      ...current,
-      {
-        id: crypto.randomUUID().slice(0, 8),
-        name: "",
-        store: null,
-        sections: [],
-      },
-    ])
+  function blank(): Draft {
+    return {
+      key: crypto.randomUUID(),
+      id: null,
+      main: false,
+      name: "",
+      aisles: [],
+    }
   }
 
-  function submit(event: React.FormEvent) {
-    event.preventDefault()
-    save.mutate(
-      lists.map((list) => ({ ...list, name: list.name.trim() })),
-      {
-        onSuccess: () => {
-          toast.success("Lists saved")
-          onDone()
-        },
-        onError: (error) =>
-          toast.error(
-            error instanceof ApiError
-              ? error.message
-              : "Couldn't save the lists"
-          ),
-      }
+  async function save() {
+    setBusy(true)
+    try {
+      await unwrap(
+        api.PUT("/api/list/lists", {
+          body: {
+            lists: drafts.map((draft) => ({
+              id: draft.id,
+              name: draft.name.trim(),
+              aisles: draft.main ? [] : draft.aisles,
+            })),
+          },
+        })
+      )
+      await queryClient.invalidateQueries({ queryKey: listQuery.queryKey })
+      toast.success(t("list.lists.saved"))
+      onDone()
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const takenBy = (aisle: string, key: string) =>
+    drafts.find(
+      (draft) =>
+        draft.key !== key && !draft.main && draft.aisles.includes(aisle)
     )
-  }
-
-  const takenBy = (section: StoreSectionId, id: string) =>
-    lists.find((list) => list.id !== id && list.sections.includes(section))
 
   return (
-    <form className="grid gap-5" onSubmit={submit}>
-      <ul className="grid gap-4">
-        {lists.map((list) => (
-          <li key={list.id} className="grid gap-3 rounded-2xl border p-4">
+    <form
+      className="grid min-w-0 gap-5"
+      onSubmit={(event) => {
+        event.preventDefault()
+        void save()
+      }}
+    >
+      <ul className="-mx-1 grid max-h-[60vh] gap-4 overflow-y-auto px-1">
+        {drafts.map((draft) => (
+          <li key={draft.key} className="grid gap-3 rounded-2xl border p-4">
             <div className="flex items-center gap-2">
               <Input
-                value={list.name}
+                value={draft.name}
                 onChange={(event) =>
-                  change(list.id, { name: event.target.value })
+                  change(draft.key, { name: event.target.value })
                 }
-                placeholder={list.id === MAIN_LIST ? "Groceries" : "Costco"}
-                aria-label="List name"
+                placeholder={
+                  draft.main
+                    ? t("list.lists.mainPlaceholder")
+                    : t("list.lists.namePlaceholder")
+                }
+                aria-label={t("list.lists.name")}
                 maxLength={40}
                 required
               />
-              <Select
-                value={list.store ?? NO_STORE}
-                onValueChange={(value) =>
-                  change(list.id, {
-                    store: value === NO_STORE ? null : (value as ShopId),
-                  })
-                }
-              >
-                <SelectTrigger className="w-40 shrink-0" aria-label="Store">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_STORE}>Any store</SelectItem>
-                  {stores.map((store) => (
-                    <SelectItem
-                      key={store.id}
-                      value={store.id}
-                      disabled={lists.some(
-                        (other) =>
-                          other.id !== list.id && other.store === store.id
-                      )}
-                    >
-                      {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {list.id !== MAIN_LIST && (
+              {!draft.main && (
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label={`Remove ${list.name || "this list"}`}
+                  aria-label={t("list.lists.remove", {
+                    name: draft.name || t("list.lists.thisList"),
+                  })}
                   onClick={() =>
-                    setLists((current) =>
-                      current.filter((l) => l.id !== list.id)
+                    setDrafts((current) =>
+                      current.filter((other) => other.key !== draft.key)
                     )
                   }
                 >
@@ -172,42 +176,41 @@ function ListsEditor({
                 </Button>
               )}
             </div>
-            {list.id === MAIN_LIST ? (
+            {draft.main ? (
               <p className="text-sm text-muted-foreground">
-                The main list: everything goes here unless an aisle or a move
-                says otherwise.
+                {t("list.lists.mainHint")}
               </p>
             ) : (
               <div className="grid gap-2">
                 <p className="text-sm text-muted-foreground">
-                  Aisles that go on this list
+                  {t("list.lists.aisles")}
                 </p>
                 <ToggleGroup
-                  type="multiple"
+                  multiple
                   variant="outline"
                   size="sm"
-                  value={list.sections}
+                  value={draft.aisles}
                   onValueChange={(value) =>
-                    change(list.id, { sections: value as StoreSectionId[] })
+                    change(draft.key, { aisles: value as string[] })
                   }
                   className="flex-wrap justify-start"
                 >
-                  {STORE_SECTIONS.filter(
-                    (section) => section.id !== "other"
-                  ).map((section) => {
-                    const other = takenBy(section.id, list.id)
+                  {aisles.map((aisle) => {
+                    const other = takenBy(aisle.id, draft.key)
                     return (
                       <ToggleGroupItem
-                        key={section.id}
-                        value={section.id}
+                        key={aisle.id}
+                        value={aisle.id}
                         disabled={Boolean(other)}
                         title={
                           other
-                            ? `On ${other.name || "another list"}`
+                            ? t("list.lists.takenBy", {
+                                name: other.name || t("list.lists.anotherList"),
+                              })
                             : undefined
                         }
                       >
-                        {section.name}
+                        {aisle.name}
                       </ToggleGroupItem>
                     )
                   })}
@@ -217,29 +220,27 @@ function ListsEditor({
           </li>
         ))}
       </ul>
-      {lists.length < MAX_LISTS && (
+      {drafts.length < MAX_LISTS && (
         <Button
           type="button"
           variant="outline"
           className="justify-self-start"
-          onClick={add}
+          onClick={() => setDrafts((current) => [...current, blank()])}
         >
           <HugeiconsIcon
             icon={Add01Icon}
             strokeWidth={2}
             data-icon="inline-start"
           />
-          Add a list
+          {t("list.lists.add")}
         </Button>
       )}
       <p className="text-sm text-muted-foreground">
-        Moving something to another list (tap it on the list) teaches Nourvio
-        where that food goes from then on. Things on a removed list move to the
-        main one.
+        {t("list.lists.movesHint")}
       </p>
-      <Button type="submit" disabled={save.isPending}>
-        {save.isPending && <Spinner data-icon="inline-start" />}
-        Save
+      <Button type="submit" disabled={busy}>
+        {busy && <Spinner data-icon="inline-start" />}
+        {t("list.lists.save")}
       </Button>
     </form>
   )

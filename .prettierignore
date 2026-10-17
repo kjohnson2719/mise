@@ -2,7 +2,10 @@ node_modules/
 coverage/
 .pnpm-store/
 pnpm-lock.yaml
-package-lock.json
-pnpm-lock.yaml
-yarn.lock
 dist/
+docs/
+apps/server/src/database/migrations/
+apps/server/src/http/openapi/openapi.json
+apps/web/src/routeTree.gen.ts
+apps/web/src/lib/api/schema.d.ts
+apps/extension/src/lib/schema.d.ts

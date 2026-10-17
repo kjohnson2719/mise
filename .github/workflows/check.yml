@@ -1,0 +1,58 @@
+name: Check
+
+# Every check Merran's code has to pass, on SQLite and Postgres: called by CI
+# for each push and pull request, and by Release before anything's built.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check and test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: merran
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      MERRAN_TEST_POSTGRES_URL: postgres://postgres:merran@localhost:5433/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm typecheck
+      - run: pnpm --filter @merran/web check:contrast
+      - run: pnpm --filter @merran/web build
+      # The web app's API types come from openapi.json, and its route tree
+      # from its route files: both are committed, so both must be current.
+      # The extension uses the same API types.
+      - run: pnpm --filter @merran/web api
+      - name: Check generated files are committed
+        run: |
+          git diff --exit-code -- apps/web/src/lib/api/schema.d.ts apps/web/src/routeTree.gen.ts
+          diff -q apps/web/src/lib/api/schema.d.ts apps/extension/src/lib/schema.d.ts
+      # On SQLite and on Postgres. The tests also check that the migrations
+      # match the entities, that openapi.json is current, and that each
+      # route file sits where its path says.
+      - run: pnpm --filter @merran/server test:all
+      # The ingredient parser, units and scaling the server and web app share.
+      - run: pnpm --filter @merran/shared test
+      # The browser extension, for Chrome and Edge, and for Firefox.
+      - run: pnpm --filter @merran/extension build
+      - run: pnpm --filter @merran/extension build:firefox

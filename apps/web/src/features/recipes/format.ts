@@ -1,39 +1,26 @@
-/** 25 → "25 min", 75 → "1 hr 15 min", 120 → "2 hr". */
-export function formatMinutes(minutes: number | null | undefined) {
-  if (!minutes) return null
+import type { TFunction } from "i18next"
+
+/** "45 min", "1 hr", "1 hr 15 min". */
+export function formatMinutes(t: TFunction, minutes: number) {
   const hours = Math.floor(minutes / 60)
   const rest = minutes % 60
-  if (!hours) return `${rest} min`
-  return rest ? `${hours} hr ${rest} min` : `${hours} hr`
+  if (hours === 0) return t("recipes.time.minutes", { count: rest })
+  if (rest === 0) return t("recipes.time.hours", { count: hours })
+  return t("recipes.time.hoursMinutes", { hours, minutes: rest })
 }
 
-/** "today", "yesterday", "3 days ago", or a date. */
-export function formatRelativeDate(iso: string) {
-  const date = new Date(iso)
-  const days = Math.floor(
-    (startOfDay(new Date()).getTime() - startOfDay(date).getTime()) / 86_400_000
-  )
-  if (days <= 0) return "today"
-  if (days === 1) return "yesterday"
-  if (days < 7) return `${days} days ago`
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: days > 300 ? "numeric" : undefined,
-  })
-}
-
-function startOfDay(date: Date) {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
-}
-
-/** "seriouseats.com/best-chili": a link that isn't a recipe yet. */
-export function linkLabel(url: string) {
+/** "www.seriouseats.com/…" → "seriouseats.com". */
+export function sourceName(url: string) {
   try {
-    const { hostname, pathname } = new URL(url)
-    const path = pathname.replace(/\/+$/, "")
-    return `${hostname.replace(/^(www|m)\./, "")}${path}`
+    return new URL(url).hostname.replace(/^www\./, "")
   } catch {
     return url
   }
+}
+
+/** Amounts of servings the kitchen way: 4, 2.5, ½. */
+export function formatServings(servings: number) {
+  return Number.isInteger(servings)
+    ? String(servings)
+    : String(Math.round(servings * 100) / 100)
 }

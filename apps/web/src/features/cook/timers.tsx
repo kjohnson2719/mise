@@ -1,7 +1,8 @@
-import * as React from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
 import { Cancel01Icon, Timer02Icon } from "@hugeicons/core-free-icons"
-import { Link } from "react-router"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { Link } from "@tanstack/react-router"
+import * as React from "react"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import { Button } from "@/components/ui/button"
@@ -13,26 +14,35 @@ import {
 } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 
+import { formatDuration } from "./durations"
+
+/** Where a timer was started from, to get back to it. */
+export type Cooking = { slug: string; scale: number; with?: string }
+
 export type Timer = {
   id: string
   label: string
   endsAt: number
   done: boolean
-  /** The cooking it was started from, to get back to it. */
-  href: string | null
+  cooking: Cooking | null
 }
 
 // Kitchen timers live outside any page, so they keep running (and ringing)
 // anywhere in the app, and are saved so a reload doesn't lose them.
-const STORAGE_KEY = "mise.timers"
+const KEY = "merran-timers"
 const listeners = new Set<() => void>()
 let timers: Timer[] = load()
 let audio: AudioContext | null = null
 
 function load(): Timer[] {
   try {
-    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "[]")
-    return Array.isArray(saved) ? saved : []
+    const saved: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]")
+    return Array.isArray(saved)
+      ? saved.filter(
+          (timer): timer is Timer =>
+            typeof timer?.id === "string" && typeof timer?.endsAt === "number"
+        )
+      : []
   } catch {
     return []
   }
@@ -41,7 +51,7 @@ function load(): Timer[] {
 function change(next: Timer[]) {
   timers = next
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(timers))
+    localStorage.setItem(KEY, JSON.stringify(timers))
   } catch {
     // Not saved; they still run until the page reloads.
   }
@@ -61,11 +71,15 @@ function wakeAudio() {
     audio ??= new AudioContext()
     void audio.resume()
   } catch {
-    // No sound here; timers still vibrate and show a message.
+    // No sound here; timers still buzz and show a message.
   }
 }
 
-export function startTimer(label: string, seconds: number, href: string) {
+export function startTimer(
+  label: string,
+  seconds: number,
+  cooking: Cooking | null
+) {
   wakeAudio()
   change([
     ...timers,
@@ -74,7 +88,7 @@ export function startTimer(label: string, seconds: number, href: string) {
       label,
       endsAt: Date.now() + seconds * 1000,
       done: false,
-      href,
+      cooking,
     },
   ])
 }
@@ -131,6 +145,7 @@ function beep(context: AudioContext) {
  * until it's seen. Mounted once for the whole app.
  */
 export function TimerAlarm() {
+  const { t } = useTranslation()
   const running = useTimers().some((timer) => !timer.done)
 
   React.useEffect(() => {
@@ -142,18 +157,23 @@ export function TimerAlarm() {
       const finished = timers.filter(
         (timer) => !timer.done && timer.endsAt <= now
       )
-      if (!finished.length) return
+      if (finished.length === 0) return
       for (const timer of finished) {
         if (audio) beep(audio)
         navigator.vibrate?.([300, 150, 300, 150, 300])
-        toast(`${timer.label} timer is done`, {
+        toast(t("cook.timers.up", { label: timer.label }), {
           id: `timer-${timer.id}`,
           duration: Infinity,
+          // Up top, clear of the cook view's Next button.
+          position: "top-center",
           action: {
-            label: "+1 min",
+            label: t("cook.timers.addMinute"),
             onClick: () => addMinute(timer.id),
           },
-          cancel: { label: "OK", onClick: () => dismissTimer(timer.id) },
+          cancel: {
+            label: t("cook.timers.ok"),
+            onClick: () => dismissTimer(timer.id),
+          },
         })
       }
       const ids = new Set(finished.map((timer) => timer.id))
@@ -167,7 +187,7 @@ export function TimerAlarm() {
       clearInterval(interval)
       document.removeEventListener("pointerdown", wakeAudio)
     }
-  }, [running])
+  }, [running, t])
 
   return null
 }
@@ -183,35 +203,41 @@ function useNow(active: boolean) {
   return now
 }
 
+/** "4:05", or "1:04:05" for an hour or more. */
 function formatRemaining(ms: number) {
   const total = Math.max(0, Math.ceil(ms / 1000))
   const hours = Math.floor(total / 3600)
   const minutes = Math.floor((total % 3600) / 60)
-  const seconds = total % 60
-  const mmss = `${String(minutes).padStart(hours ? 2 : 1, "0")}:${String(seconds).padStart(2, "0")}`
-  return hours ? `${hours}:${mmss}` : mmss
+  const seconds = String(total % 60).padStart(2, "0")
+  return hours
+    ? `${hours}:${String(minutes).padStart(2, "0")}:${seconds}`
+    : `${minutes}:${seconds}`
 }
 
-/** Every timer with its label, a minute more, and cancel. For cooking. */
+const CHIP = {
+  running: "bg-highlight text-highlight-foreground",
+  done: "animate-pulse bg-destructive text-white",
+}
+
+/** Every timer, counting down, with a minute more and cancel. For cooking. */
 export function TimerChips({ className }: { className?: string }) {
+  const { t } = useTranslation()
   const list = useTimers()
   const now = useNow(list.length > 0)
-  if (!list.length) return null
+  if (list.length === 0) return null
   return (
     <ul
-      className={cn("flex flex-wrap justify-end gap-2", className)}
-      aria-label="Timers"
+      className={cn("flex flex-wrap gap-2", className)}
+      aria-label={t("cook.timers.list")}
     >
       {list.map((timer) => (
         <li
           key={timer.id}
           role="timer"
-          aria-label={`${timer.label} timer`}
+          aria-label={t("cook.timers.label", { label: timer.label })}
           className={cn(
             "flex h-10 items-center gap-1.5 rounded-full pr-1 pl-3 text-sm font-semibold",
-            timer.done
-              ? "animate-pulse bg-destructive text-white"
-              : "bg-highlight text-highlight-foreground"
+            timer.done ? CHIP.done : CHIP.running
           )}
         >
           <HugeiconsIcon
@@ -221,12 +247,14 @@ export function TimerChips({ className }: { className?: string }) {
           />
           <span className="max-w-28 truncate">{timer.label}</span>
           <span className="tabular-nums">
-            {timer.done ? "Done" : formatRemaining(timer.endsAt - now)}
+            {timer.done
+              ? t("cook.timers.done")
+              : formatRemaining(timer.endsAt - now)}
           </span>
           <button
             type="button"
             onClick={() => addMinute(timer.id)}
-            aria-label={`Add a minute to ${timer.label}`}
+            aria-label={t("cook.timers.addMinuteTo", { label: timer.label })}
             className="flex h-8 items-center rounded-full px-2 text-xs hover:bg-black/10"
           >
             +1
@@ -234,7 +262,11 @@ export function TimerChips({ className }: { className?: string }) {
           <button
             type="button"
             onClick={() => dismissTimer(timer.id)}
-            aria-label={timer.done ? "Dismiss timer" : "Cancel timer"}
+            aria-label={
+              timer.done
+                ? t("cook.timers.dismiss", { label: timer.label })
+                : t("cook.timers.cancel", { label: timer.label })
+            }
             className="flex size-8 items-center justify-center rounded-full hover:bg-black/10"
           >
             <HugeiconsIcon
@@ -250,17 +282,25 @@ export function TimerChips({ className }: { className?: string }) {
 }
 
 /**
- * Small countdowns for the app's top bar while cooking elsewhere, each a
- * link back to the cooking it came from.
+ * Small countdowns for the top bar while cooking elsewhere in the app, each
+ * a link back to the cooking it came from.
  */
 export function TimerBadges() {
+  const { t } = useTranslation()
   const list = useTimers()
   const now = useNow(list.length > 0)
-  if (!list.length) return null
+  if (list.length === 0) return null
   const shown = [...list].sort((a, b) => a.endsAt - b.endsAt).slice(0, 2)
   return (
-    <ul className="flex items-center gap-1.5" aria-label="Timers">
+    <ul
+      className="flex items-center gap-1.5"
+      aria-label={t("cook.timers.list")}
+    >
       {shown.map((timer) => {
+        const style = cn(
+          "flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-semibold",
+          timer.done ? CHIP.done : CHIP.running
+        )
         const content = (
           <>
             <HugeiconsIcon
@@ -269,20 +309,29 @@ export function TimerBadges() {
               className="size-3.5"
             />
             <span className="tabular-nums">
-              {timer.done ? "Done" : formatRemaining(timer.endsAt - now)}
+              {timer.done
+                ? t("cook.timers.done")
+                : formatRemaining(timer.endsAt - now)}
             </span>
           </>
         )
-        const style = cn(
-          "flex h-8 items-center gap-1 rounded-full px-2.5 text-xs font-semibold",
-          timer.done
-            ? "animate-pulse bg-destructive text-white"
-            : "bg-highlight text-highlight-foreground"
-        )
         return (
-          <li key={timer.id} role="timer" aria-label={`${timer.label} timer`}>
-            {timer.href ? (
-              <Link to={timer.href} className={style} title={timer.label}>
+          <li
+            key={timer.id}
+            role="timer"
+            aria-label={t("cook.timers.label", { label: timer.label })}
+          >
+            {timer.cooking ? (
+              <Link
+                to="/recipes/$slug/cook"
+                params={{ slug: timer.cooking.slug }}
+                search={{
+                  scale: timer.cooking.scale,
+                  ...(timer.cooking.with ? { with: timer.cooking.with } : {}),
+                }}
+                className={style}
+                title={timer.label}
+              >
                 {content}
               </Link>
             ) : (
@@ -294,51 +343,61 @@ export function TimerBadges() {
         )
       })}
       {list.length > 2 && (
-        <li className="text-xs text-muted-foreground">+{list.length - 2}</li>
+        <li className="text-xs text-muted-foreground">
+          {t("cook.timers.more", { count: list.length - 2 })}
+        </li>
       )}
     </ul>
   )
 }
 
 const PRESETS = [1, 3, 5, 10, 15, 20, 30, 45, 60]
+const MOST_MINUTES = 24 * 60
 
-/** A timer for something the steps don't time, like "rest the dough". */
-export function NewTimerButton({ href }: { href: string }) {
+/** A timer for something the steps don't time, like resting the dough. */
+export function NewTimerButton({ cooking }: { cooking: Cooking }) {
+  const { t } = useTranslation()
   const [open, setOpen] = React.useState(false)
   const [minutes, setMinutes] = React.useState("")
   const typed = Number(minutes)
+  const valid = typed > 0 && typed <= MOST_MINUTES
 
   function start(length: number) {
-    const label = length === 60 ? "1 hr" : `${length} min`
-    startTimer(label, Math.round(length * 60), href)
-    toast(`Timer started: ${label}`)
+    const seconds = Math.round(length * 60)
+    startTimer(formatDuration(t, seconds), seconds, cooking)
     setOpen(false)
     setMinutes("")
   }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="icon"
-          aria-label="New timer"
-          title="New timer"
-        >
-          <HugeiconsIcon icon={Timer02Icon} strokeWidth={2} />
-        </Button>
+      <PopoverTrigger
+        render={
+          <Button
+            variant="outline"
+            size="icon"
+            aria-label={t("cook.timers.new")}
+            title={t("cook.timers.new")}
+          />
+        }
+      >
+        <HugeiconsIcon icon={Timer02Icon} strokeWidth={2} />
       </PopoverTrigger>
-      <PopoverContent align="end" className="grid w-64 gap-3">
-        <p className="text-sm font-medium">New timer</p>
+      <PopoverContent
+        align="end"
+        className="w-[21rem] max-w-[calc(100vw-2rem)] gap-3"
+      >
+        <p className="text-sm font-medium">{t("cook.timers.new")}</p>
         <div className="grid grid-cols-3 gap-2">
           {PRESETS.map((length) => (
             <Button
               key={length}
               variant="secondary"
               size="sm"
+              className="px-2"
               onClick={() => start(length)}
             >
-              {length === 60 ? "1 hr" : `${length} min`}
+              {formatDuration(t, length * 60)}
             </Button>
           ))}
         </div>
@@ -346,22 +405,22 @@ export function NewTimerButton({ href }: { href: string }) {
           className="flex gap-2"
           onSubmit={(event) => {
             event.preventDefault()
-            if (typed > 0 && typed <= 24 * 60) start(typed)
+            if (valid) start(typed)
           }}
         >
           <Input
             type="number"
             inputMode="decimal"
             min={0.5}
-            max={24 * 60}
+            max={MOST_MINUTES}
             step="any"
-            placeholder="Minutes"
-            aria-label="Minutes"
+            placeholder={t("cook.timers.minutes")}
+            aria-label={t("cook.timers.minutes")}
             value={minutes}
             onChange={(event) => setMinutes(event.target.value)}
           />
-          <Button type="submit" disabled={!(typed > 0 && typed <= 24 * 60)}>
-            Start
+          <Button type="submit" disabled={!valid}>
+            {t("cook.timers.start")}
           </Button>
         </form>
       </PopoverContent>

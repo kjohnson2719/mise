@@ -1,18 +1,19 @@
 import * as React from "react"
 
-// Below Tailwind's `md` breakpoint (768px): phones get the bottom tabs and drawers.
-const MOBILE_QUERY = "(max-width: 767px)"
-
-function subscribe(onChange: () => void) {
-  const query = window.matchMedia(MOBILE_QUERY)
-  query.addEventListener("change", onChange)
-  return () => query.removeEventListener("change", onChange)
-}
+const MOBILE_BREAKPOINT = 768
 
 export function useIsMobile() {
-  return React.useSyncExternalStore(
-    subscribe,
-    () => window.matchMedia(MOBILE_QUERY).matches,
-    () => false
-  )
+  const [isMobile, setIsMobile] = React.useState<boolean | undefined>(undefined)
+
+  React.useEffect(() => {
+    const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`)
+    const onChange = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    }
+    mql.addEventListener("change", onChange)
+    setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    return () => mql.removeEventListener("change", onChange)
+  }, [])
+
+  return !!isMobile
 }

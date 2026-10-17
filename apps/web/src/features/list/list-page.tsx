@@ -1,35 +1,26 @@
-import * as React from "react"
-import { HugeiconsIcon } from "@hugeicons/react"
 import {
   Add01Icon,
   ArrowDataTransferHorizontalIcon,
-  ArrowRight01Icon,
   Calendar03Icon,
+  Cancel01Icon,
   Delete02Icon,
   FridgeIcon,
   MoreHorizontalIcon,
   RepeatIcon,
   ShoppingBasket01Icon,
+  ShoppingCart01Icon,
   Store01Icon,
+  Tick02Icon,
 } from "@hugeicons/core-free-icons"
-import {
-  DEFAULT_LISTS,
-  MAIN_LIST,
-  SHOPS,
-  STORE_SECTIONS,
-  type ItemPrice,
-  type ListBulkInput,
-  type ListPrices,
-  type Person,
-  type ShoppingItem,
-  type ShoppingList,
-} from "@mise/shared"
-import { Link } from "react-router"
-import { toast } from "sonner"
+import { HugeiconsIcon } from "@hugeicons/react"
+import { storeSearch } from "@merran/shared"
+import { useQuery } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
+import * as React from "react"
+import { Trans, useTranslation } from "react-i18next"
 
 import { PageHeader } from "@/components/layout/page-header"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,277 +44,263 @@ import {
 } from "@/components/ui/input-group"
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
-import { monthDay } from "@/features/plan/dates"
-import { AisleDialog } from "@/features/select/aisle-dialog"
-import { SelectMark } from "@/features/select/select-mark"
+import { useActiveHousehold } from "@/features/auth/use-me"
+import { isAdminRole } from "@/features/household/queries"
+import { usePeopleHere, type Person } from "@/features/live/live-updates"
+import { SelectionBar, SelectionHeader } from "@/features/select/selection-bar"
 import {
-  SelectionBar,
-  SelectionHeader,
+  useSelection,
   useSelectionKeepOnly,
-  type SelectionAction,
-} from "@/features/select/selection-bar"
-import { undoable, useHidden } from "@/features/select/undo"
-import { useLongPress, useSelection } from "@/features/select/use-selection"
-import { useHouseholdInfo } from "@/features/settings/use-household"
-import { saleThrough } from "@/features/shop/sale-text"
-import { useShopStatus } from "@/features/shop/use-shop"
-import { ApiError } from "@/lib/api"
+} from "@/features/select/use-selection"
+import { householdQuery } from "@/features/household/queries"
+import {
+  FindProductDialog,
+  type Finding,
+} from "@/features/stores/find-product-dialog"
+import {
+  formatPrice,
+  useListPrices,
+  yourStoresQuery,
+  type ItemPrice,
+} from "@/features/stores/queries"
 import { initials } from "@/lib/initials"
 import { cn } from "@/lib/utils"
 
 import { AddFromPlanDialog } from "./add-from-plan-dialog"
-import { EditItemDialog, OnHandDialog, WeeklyItemsDialog } from "./list-dialogs"
-import { ListsDialog } from "./lists-dialog"
-import { useLiveList } from "./use-live-list"
+import { ItemRow, type RowFind, type RowPrices } from "./item-row"
 import {
-  useAddListItem,
-  useClearChecked,
-  useList,
-  useListBulk,
-  useListPrices,
-  usePutAway,
-  useUpdateListItem,
-} from "./use-list"
+  AisleDialog,
+  EditItemDialog,
+  EveryWeekDialog,
+  FoodsDialog,
+  ListPickDialog,
+  OnHandDialog,
+} from "./list-dialogs"
+import { ListsDialog } from "./lists-dialog"
+import { listQuery, type List, type ListItem } from "./queries"
+import { useListActions } from "./use-list-actions"
+import { UsualBuys } from "./usual-buys"
 
-const LIST_KEY = "mise.list"
+/** Which list this device last had open. */
+const CHOSEN_LIST = "merran.list"
 
-const SHOP_NAMES = { kroger: "Fry's", costco: "Costco", walmart: "Walmart" }
-
-const money = (value: number) =>
-  value.toLocaleString(undefined, { style: "currency", currency: "USD" })
-
-const things = (n: number) => `${n} ${n === 1 ? "thing" : "things"}`
-
-/** An item's part in select mode. */
-type RowSelect = {
-  selecting: boolean
-  picked: boolean
-  onToggle: () => void
-  /** A long press on a phone, which starts selecting with this one. */
-  onLongPress: () => void
-}
-
-/** The list last looked at on this device. */
 function readChosenList() {
   try {
-    return localStorage.getItem(LIST_KEY) ?? MAIN_LIST
+    return localStorage.getItem(CHOSEN_LIST)
   } catch {
-    return MAIN_LIST
+    return null
   }
-}
-
-/** What a filter keeps: everything, one meal's things, every-week items, or what was typed in. */
-type Filter = "all" | "weekly" | "manual" | `meal:${string}`
-
-function keeps(filter: Filter, item: ShoppingItem) {
-  if (filter === "all") return true
-  if (filter === "weekly" || filter === "manual") return item.source === filter
-  return item.recipes.includes(filter.slice(5))
 }
 
 /**
- * The household's shopping lists: a card for each store with what's left,
- * about what it costs and the way to shop it, then the chosen list by aisle.
+ * The shopping lists: add from the plan or type things in, then what's
+ * left to get by aisle in a walk through the store, and what's in the cart
+ * under it. With a list for each store, cards at the top pick which.
  */
 export function ListPage() {
-  const list = useList()
-  const others = useLiveList()
-  const prices = useListPrices().data ?? {}
-  const clear = useClearChecked()
-  const putAway = usePutAway()
+  const { t, i18n } = useTranslation()
+  const list = useQuery(listQuery)
+  const actions = useListActions()
+  const admin = isAdminRole(useActiveHousehold()?.role)
+  const others = usePeopleHere()
   const [fromPlan, setFromPlan] = React.useState(false)
-  const [weekly, setWeekly] = React.useState(false)
+  const [everyWeek, setEveryWeek] = React.useState(false)
   const [onHand, setOnHand] = React.useState(false)
-  const [editing, setEditing] = React.useState<ShoppingItem | null>(null)
+  const [foods, setFoods] = React.useState(false)
   const [managing, setManaging] = React.useState(false)
+  const [editing, setEditing] = React.useState<ListItem | null>(null)
+  const [choosingAisle, setChoosingAisle] = React.useState(false)
+  const [choosingList, setChoosingList] = React.useState(false)
   const [showCart, setShowCart] = React.useState(false)
-  const [filter, setFilter] = React.useState<Filter>("all")
-  const lists = useHouseholdInfo().data?.lists ?? DEFAULT_LISTS
-  const [chosenList, setChosenList] = React.useState(readChosenList)
-  const current =
-    lists.find((l) => l.id === chosenList) ?? lists[0] ?? DEFAULT_LISTS[0]!
-  const split = lists.length > 1
+  const [chosen, setChosen] = React.useState(readChosenList)
 
-  function chooseList(id: string) {
-    setChosenList(id)
-    setFilter("all")
+  const { data: household } = useQuery(householdQuery)
+  const { data: yours = [] } = useQuery(yourStoresQuery)
+  const [finding, setFinding] = React.useState<Finding | null>(null)
+  /**
+   * Find, at any of the household's stores: a store Merran can send to
+   * opens its product picker, and the pick is kept for that food there;
+   * any other opens its site's search.
+   */
+  const find: RowFind = {
+    stores: yours.filter((store) => store.connected || store.searchable),
+    onFind: (item, store) => {
+      if (store.connected) {
+        setFinding({ line: { itemId: item.id, name: item.name }, store })
+        return
+      }
+      const url = storeSearch(store.key, household?.country, item.name)
+      if (url) window.open(url, "_blank", "noopener,noreferrer")
+    },
+  }
+  const lists = list.data?.lists ?? []
+  const aisles = list.data?.aisles ?? []
+  const all = list.data?.items ?? []
+  const split = lists.length > 1
+  const current = lists.find((option) => option.id === chosen) ?? lists[0]
+  // With several lists, the one chosen; else everything.
+  const items = split ? all.filter((item) => item.list === current?.id) : all
+  const toGet = items.filter((item) => !item.checked)
+  const got = items.filter((item) => item.checked)
+  const totalLeft = all.filter((item) => !item.checked).length
+  const prices = useListPrices()
+  const priceOf = (item: ListItem) => prices.items.get(item.id) ?? null
+  // A column of prices when anything left on the list showing has one.
+  const rowPrices: RowPrices | null = toGet.some(priceOf)
+    ? { of: priceOf, currency: prices.currency }
+    : null
+  // Each aisle's things A to Z, as they read.
+  const byName = new Intl.Collator(i18n.language, { sensitivity: "base" })
+  const sorted = (items: ListItem[]) =>
+    items.sort((a, b) => byName.compare(a.name, b.name))
+  const byAisle = [
+    ...aisles.map((aisle) => ({
+      id: aisle.id,
+      name: aisle.name,
+      items: sorted(toGet.filter((item) => item.aisle === aisle.id)),
+    })),
+    {
+      id: "none",
+      name: t("list.noAisle"),
+      items: sorted(
+        toGet.filter((item) => !aisles.some((aisle) => aisle.id === item.aisle))
+      ),
+    },
+  ].filter((aisle) => aisle.items.length > 0)
+
+  function choose(id: string) {
+    setChosen(id)
     try {
-      localStorage.setItem(LIST_KEY, id)
+      localStorage.setItem(CHOSEN_LIST, id)
     } catch {
-      // Not remembered; no harm.
+      // Not remembered on this device; no harm.
     }
   }
 
-  const isHidden = useHidden()
-  const all = (list.data ?? []).filter((item) => !isHidden(item.id))
-  // With several lists, the one chosen; else everything.
-  const items = split ? all.filter((item) => item.listId === current.id) : all
-  const toGet = items.filter((item) => !item.checked)
-  const got = items.filter((item) => item.checked)
-  const filters = filtersFor(toGet)
-  const shown = filters.some((f) => f.id === filter) ? filter : "all"
-  const showing = toGet.filter((item) => keeps(shown, item))
-  const sections = STORE_SECTIONS.map((section) => ({
-    ...section,
-    items: showing.filter((item) => item.sectionId === section.id),
-  })).filter((section) => section.items.length)
-  const priced = toGet.some((item) => prices[item.id])
-  const totalLeft = all.filter((item) => !item.checked).length
-
-  // Select mode: what's showing, the cart too when it's open.
   const selection = useSelection()
-  const bulk = useListBulk()
-  const [choosingAisle, setChoosingAisle] = React.useState(false)
-  const selectable = [...showing, ...(showCart ? got : [])].map(
-    (item) => item.id
-  )
+  const selectable = [...toGet, ...(showCart ? got : [])].map((item) => item.id)
   useSelectionKeepOnly(selection, selectable)
-  const pickedIds = selectable.filter((id) => selection.isPicked(id))
-  const selectOf = (id: string): RowSelect => ({
-    selecting: selection.selecting,
-    picked: selection.isPicked(id),
-    onToggle: () => selection.toggle(id),
-    onLongPress: () => selection.start(id),
-  })
+  const picked = selectable.filter((id) => selection.isPicked(id))
+  const elsewhere = lists.filter((option) => option.id !== current?.id)
+  // Send, for the list showing: each thing to the store it's picked at.
+  const canSend = yours.some((store) => store.connected) && toGet.length > 0
+  /** The list showing, when there's more than one. */
+  const listShowing = split ? current?.id : undefined
 
-  /** Removes these from the list, with Undo. */
-  function remove(ids: string[], message: string) {
-    undoable({
-      message,
-      ids,
-      commit: () => bulk.mutateAsync({ action: "delete", ids }),
-    })
+  const bulk = async (
+    action: Parameters<typeof actions.bulk>[1],
+    said: (count: number) => string
+  ) => {
+    if (await actions.bulk(picked, action, said)) selection.done()
   }
 
-  function run(input: ListBulkInput, said: (changed: number) => string) {
-    bulk.mutate(input, {
-      onSuccess: ({ changed }) => {
-        toast.success(said(changed))
-        selection.done()
-      },
-      onError: (error) =>
-        toast.error(
-          error instanceof ApiError ? error.message : "That didn't work"
-        ),
-    })
-  }
-
-  const moves: SelectionAction[] = split
-    ? lists
-        .filter((other) => other.id !== current.id)
-        .map((other) => ({
-          label: `Move to ${other.name}`,
-          icon: ArrowDataTransferHorizontalIcon,
-          onSelect: () =>
-            run(
-              { action: "move", ids: pickedIds, listId: other.id },
-              (changed) => `Moved ${things(changed)} to ${other.name}`
-            ),
-        }))
-    : []
-
-  function putAwayChecked() {
-    putAway.mutate(undefined, {
-      onSuccess: ({ stored }) =>
-        toast.success(
-          stored
-            ? `Put ${stored} ${stored === 1 ? "thing" : "things"} in the pantry`
-            : "Cleared the cart"
-        ),
-      onError: (error) =>
-        toast.error(
-          error instanceof ApiError ? error.message : "Couldn't put those away"
-        ),
-    })
-  }
-
-  function clearChecked() {
-    clear.mutate(undefined, {
-      onSuccess: ({ removed }) =>
-        toast(`Cleared ${removed} checked ${removed === 1 ? "item" : "items"}`),
-    })
+  /** Clears what's checked, or everything, on the list showing. */
+  function clear(which: "checked" | "all") {
+    if (!split) return void actions.clear(which)
+    const ids = (which === "checked" ? got : items).map((item) => item.id)
+    void actions.bulk(ids, { action: "remove" }, (count) =>
+      t("list.cleared", { count })
+    )
   }
 
   return (
     <>
       <PageHeader
-        title="List"
+        title={t("list.title")}
         description={
           list.isPending
-            ? "Everything to pick up."
-            : totalLeft
-              ? `${totalLeft} to get${split ? ` across ${lists.length} lists` : ""}`
-              : "Nothing left to get."
+            ? t("list.loading")
+            : totalLeft === 0
+              ? t("list.nothingToGet")
+              : split
+                ? t("list.toGetAcross", {
+                    things: t("list.toGet", { count: totalLeft }),
+                    lists: t("list.listCount", { count: lists.length }),
+                  })
+                : t("list.toGet", { count: totalLeft })
         }
         actions={
           selection.selecting ? (
             <SelectionHeader selection={selection} allIds={selectable} />
           ) : (
             <>
+              {canSend && current && (
+                <Button
+                  variant="outline"
+                  render={
+                    <Link to="/list/send" search={{ list: current.id }} />
+                  }
+                >
+                  <HugeiconsIcon
+                    icon={ShoppingCart01Icon}
+                    strokeWidth={2}
+                    data-icon="inline-start"
+                  />
+                  {t("list.send")}
+                </Button>
+              )}
               <Button onClick={() => setFromPlan(true)}>
                 <HugeiconsIcon
                   icon={Calendar03Icon}
                   strokeWidth={2}
                   data-icon="inline-start"
                 />
-                Add from plan
+                {t("list.fromPlan")}
               </Button>
               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    aria-label="More list options"
-                  >
-                    <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={2} />
-                  </Button>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label={t("list.more")}
+                    />
+                  }
+                >
+                  <HugeiconsIcon icon={MoreHorizontalIcon} strokeWidth={2} />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuItem
-                    disabled={!selectable.length}
-                    onSelect={() => selection.start()}
+                    disabled={selectable.length === 0}
+                    onClick={() => selection.start()}
                   >
-                    Select
+                    {t("list.select")}
+                  </DropdownMenuItem>
+                  {admin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => setManaging(true)}>
+                        {split ? t("list.editLists") : t("list.splitByStore")}
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setEveryWeek(true)}>
+                    {t("list.everyWeek")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setOnHand(true)}>
+                    {t("list.onHand")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setFoods(true)}>
+                    {t("list.foods")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setManaging(true)}>
-                    {split ? "Edit lists" : "Split into lists by store"}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onSelect={() => setWeekly(true)}>
-                    Every week items
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setOnHand(true)}>
-                    Always on hand
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    disabled={!got.length}
-                    onSelect={putAwayChecked}
+                    disabled={got.length === 0}
+                    onClick={() => clear("checked")}
                   >
-                    Put checked items away
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    disabled={!got.length}
-                    onSelect={clearChecked}
-                  >
-                    Clear checked items
+                    {split && current
+                      ? t("list.clearCheckedOn", { list: current.name })
+                      : t("list.clearChecked")}
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     variant="destructive"
-                    disabled={!items.length}
-                    onSelect={() =>
-                      remove(
-                        items.map((item) => item.id),
-                        split
-                          ? `Cleared the ${current.name} list`
-                          : "Cleared the list"
-                      )
-                    }
+                    disabled={items.length === 0}
+                    onClick={() => clear("all")}
                   >
-                    {split
-                      ? `Clear the ${current.name} list`
-                      : "Clear the list"}
+                    {split && current
+                      ? t("list.clearListNamed", { list: current.name })
+                      : t("list.clearAll")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -334,138 +311,95 @@ export function ListPage() {
 
       <div className="grid gap-6">
         {others.length > 0 && <ShoppingWith people={others} />}
-        <StoreCards
-          lists={lists}
-          items={all}
-          prices={prices}
-          current={current.id}
-          split={split}
-          onChoose={chooseList}
-          onManage={() => setManaging(true)}
-        />
+        {(split || admin) && current && (
+          <StoreCards
+            lists={lists}
+            items={all}
+            current={current.id}
+            split={split}
+            admin={admin}
+            priceOf={priceOf}
+            currency={prices.currency}
+            onChoose={choose}
+            onManage={() => setManaging(true)}
+          />
+        )}
 
         <QuickAdd list={split ? current : undefined} />
+        {!selection.selecting && <UsualBuys />}
 
         {list.isPending ? (
           <div className="grid gap-3">
             <Skeleton className="h-40 rounded-3xl" />
             <Skeleton className="h-56 rounded-3xl" />
           </div>
-        ) : list.isError ? (
-          <p className="text-muted-foreground">Couldn't load the list.</p>
-        ) : split && all.length > 0 && !items.length ? (
+        ) : split && all.length > 0 && items.length === 0 ? (
           <p className="py-6 text-center text-muted-foreground">
-            Nothing on the {current.name} list. Move things here by tapping them
-            on another list, or choose which aisles go here in{" "}
-            <button
-              type="button"
-              className="font-medium text-foreground underline underline-offset-4"
-              onClick={() => setManaging(true)}
-            >
-              Edit lists
-            </button>
-            .
+            {t("list.emptyHere", { list: current?.name })}
           </p>
-        ) : !items.length ? (
-          <Empty className="border border-dashed">
+        ) : items.length === 0 ? (
+          <Empty className="rounded-3xl border border-dashed">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <HugeiconsIcon icon={ShoppingBasket01Icon} strokeWidth={2} />
               </EmptyMedia>
-              <EmptyTitle>The list is empty</EmptyTitle>
-              <EmptyDescription>
-                Add the week's planned meals and Nourvio works out what to buy,
-                grouped by aisle. Things you get every week come along too.
-              </EmptyDescription>
+              <EmptyTitle>{t("list.empty")}</EmptyTitle>
+              <EmptyDescription>{t("list.emptyHint")}</EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
               <div className="flex flex-wrap justify-center gap-2">
-                <Button onClick={() => setFromPlan(true)}>Add from plan</Button>
-                <Button variant="outline" onClick={() => setWeekly(true)}>
-                  Set up every-week items
+                <Button onClick={() => setFromPlan(true)}>
+                  {t("list.fromPlan")}
+                </Button>
+                <Button variant="outline" onClick={() => setEveryWeek(true)}>
+                  {t("list.setUpEveryWeek")}
                 </Button>
               </div>
             </EmptyContent>
           </Empty>
         ) : (
           <>
-            {filters.length > 2 && (
-              <div
-                role="group"
-                aria-label="Show"
-                className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:px-0"
-              >
-                <span className="mr-1 hidden text-sm text-muted-foreground md:inline">
-                  Show
-                </span>
-                {filters.map((f) => (
-                  <Button
-                    key={f.id}
-                    size="sm"
-                    variant={f.id === shown ? "default" : "outline"}
-                    aria-pressed={f.id === shown}
-                    className="shrink-0 rounded-full"
-                    onClick={() => setFilter(f.id)}
-                  >
-                    {f.label}
-                    <span
-                      className={cn(
-                        "tabular-nums",
-                        f.id === shown
-                          ? "text-primary-foreground/75"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {f.count}
-                    </span>
-                  </Button>
-                ))}
-              </div>
-            )}
-
-            {sections.map((section) => (
+            {byAisle.map((aisle) => (
               <section
-                key={section.id}
-                aria-labelledby={`aisle-${section.id}`}
+                key={aisle.id}
+                aria-labelledby={`aisle-${aisle.id}`}
                 className="@container rounded-3xl border bg-card px-5 text-card-foreground md:px-6"
               >
                 <h2
-                  id={`aisle-${section.id}`}
+                  id={`aisle-${aisle.id}`}
                   className="flex items-baseline gap-2 pt-4 pb-3 text-lg font-semibold tracking-tight"
                 >
-                  {section.name}
+                  {aisle.name}
                   <span className="font-sans text-sm font-normal text-muted-foreground">
-                    {section.items.length}
+                    {aisle.items.length}
                   </span>
                 </h2>
                 <ul className="divide-y border-t">
-                  {section.items.map((item) => (
+                  {aisle.items.map((item) => (
                     <ItemRow
                       key={item.id}
                       item={item}
-                      price={prices[item.id]}
-                      priced={priced}
+                      selection={selection}
                       onEdit={() => setEditing(item)}
-                      select={selectOf(item.id)}
+                      find={find}
+                      prices={rowPrices}
                     />
                   ))}
                 </ul>
               </section>
             ))}
 
-            {!toGet.length && (
+            {toGet.length === 0 && (
               <div className="grid justify-items-center gap-3 py-4 text-center">
-                <p className="text-muted-foreground">
-                  All done. Nice shopping.
-                </p>
+                <p className="text-muted-foreground">{t("list.allDone")}</p>
                 {got.length > 0 && (
-                  <Button disabled={putAway.isPending} onClick={putAwayChecked}>
+                  <Button onClick={() => void actions.putAway(listShowing)}>
                     <HugeiconsIcon
                       icon={FridgeIcon}
                       strokeWidth={2}
                       data-icon="inline-start"
                     />
-                    Put it all away
+                    {t("list.putAwayAll")}
                   </Button>
                 )}
               </div>
@@ -474,15 +408,15 @@ export function ListPage() {
             {got.length > 0 && (
               <section
                 aria-labelledby="in-the-cart"
-                className="rounded-3xl border bg-muted/40 px-5 md:px-6"
+                className="@container rounded-3xl border bg-muted/40 px-5 md:px-6"
               >
                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3.5">
                   <p id="in-the-cart" className="min-w-0 text-muted-foreground">
                     <span className="font-semibold text-foreground">
-                      {got.length} in the cart
+                      {t("list.inTheCart", { count: got.length })}
                     </span>
                     {!showCart && (
-                      <span className="first-letter:uppercase">
+                      <span>
                         :{" "}
                         {got.map((item) => item.name.toLowerCase()).join(", ")}
                       </span>
@@ -496,21 +430,20 @@ export function ListPage() {
                       aria-expanded={showCart}
                       onClick={() => setShowCart((open) => !open)}
                     >
-                      {showCart ? "Hide" : "Show"}
+                      {showCart ? t("list.hide") : t("list.show")}
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       className="rounded-full bg-card"
-                      disabled={putAway.isPending}
-                      onClick={putAwayChecked}
+                      onClick={() => void actions.putAway(listShowing)}
                     >
                       <HugeiconsIcon
                         icon={FridgeIcon}
                         strokeWidth={2}
                         data-icon="inline-start"
                       />
-                      Put away
+                      {t("list.putAway")}
                     </Button>
                   </div>
                 </div>
@@ -520,9 +453,9 @@ export function ListPage() {
                       <ItemRow
                         key={item.id}
                         item={item}
-                        priced={false}
+                        selection={selection}
                         onEdit={() => setEditing(item)}
-                        select={selectOf(item.id)}
+                        find={find}
                       />
                     ))}
                   </ul>
@@ -536,363 +469,119 @@ export function ListPage() {
       <SelectionBar
         selection={selection}
         actions={[
-          ...(moves.length === 1 ? moves : []),
           {
-            label: "Aisle",
+            label: t("list.bulk.check"),
+            icon: Tick02Icon,
+            onSelect: () =>
+              void bulk({ action: "check" }, (count) =>
+                t("list.bulk.checked", { count })
+              ),
+          },
+          ...(showCart
+            ? [
+                {
+                  label: t("list.bulk.uncheck"),
+                  icon: Cancel01Icon,
+                  onSelect: () =>
+                    void bulk({ action: "uncheck" }, (count) =>
+                      t("list.bulk.unchecked", { count })
+                    ),
+                },
+              ]
+            : []),
+          ...(split
+            ? [
+                {
+                  label: t("list.bulk.list"),
+                  icon: ArrowDataTransferHorizontalIcon,
+                  onSelect: () => setChoosingList(true),
+                },
+              ]
+            : []),
+          {
+            label: t("list.bulk.aisle"),
             icon: Store01Icon,
             onSelect: () => setChoosingAisle(true),
           },
           {
-            label: "Every week",
+            label: t("list.bulk.everyWeek"),
             icon: RepeatIcon,
             onSelect: () =>
-              run({ action: "weekly", ids: pickedIds }, (changed) =>
-                changed
-                  ? `${things(changed)} on the list every week now`
-                  : "Those are every week already"
+              void bulk({ action: "every-week" }, (count) =>
+                t("list.bulk.weekly", { count })
               ),
           },
           {
-            label: "Remove",
+            label: t("list.bulk.remove"),
             icon: Delete02Icon,
             destructive: true,
-            onSelect: () => {
-              remove(pickedIds, `Removed ${things(pickedIds.length)}`)
-              selection.done()
-            },
+            onSelect: () =>
+              void bulk({ action: "remove" }, (count) =>
+                t("list.bulk.removed", { count })
+              ),
           },
         ]}
-        more={moves.length > 1 ? moves : []}
       />
       <AisleDialog
-        count={pickedIds.length}
+        count={picked.length}
+        aisles={aisles}
         open={choosingAisle}
         onOpenChange={setChoosingAisle}
-        onPick={(sectionId) => {
+        onPick={(aisle) => {
           setChoosingAisle(false)
-          run(
-            { action: "aisle", ids: pickedIds, sectionId },
-            (changed) =>
-              `Moved ${things(changed)} to ${STORE_SECTIONS.find((section) => section.id === sectionId)?.name}`
+          void bulk({ action: "aisle", aisle: aisle?.id ?? null }, (count) =>
+            t("list.bulk.moved", {
+              count,
+              aisle: aisle?.name ?? t("list.noAisle"),
+            })
+          )
+        }}
+      />
+      <ListPickDialog
+        count={picked.length}
+        lists={elsewhere}
+        open={choosingList}
+        onOpenChange={setChoosingList}
+        onPick={(target) => {
+          setChoosingList(false)
+          void bulk({ action: "move", list: target.id }, (count) =>
+            t("list.bulk.movedTo", { count, list: target.name })
           )
         }}
       />
       <AddFromPlanDialog open={fromPlan} onOpenChange={setFromPlan} />
-      <WeeklyItemsDialog open={weekly} onOpenChange={setWeekly} />
+      <EveryWeekDialog open={everyWeek} onOpenChange={setEveryWeek} />
       <OnHandDialog open={onHand} onOpenChange={setOnHand} />
-      <ListsDialog open={managing} onOpenChange={setManaging} />
-      <EditItemDialog item={editing} onClose={() => setEditing(null)} />
-    </>
-  )
-}
-
-/** The ways to narrow what's left: by meal, every week, or typed in. */
-function filtersFor(items: ShoppingItem[]) {
-  const meals = new Map<string, number>()
-  for (const item of items) {
-    for (const name of item.recipes) meals.set(name, (meals.get(name) ?? 0) + 1)
-  }
-  const count = (source: ShoppingItem["source"]) =>
-    items.filter((item) => item.source === source).length
-  return [
-    { id: "all" as Filter, label: "Everything", count: items.length },
-    ...[...meals]
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, n]) => ({
-        id: `meal:${name}` as Filter,
-        label: name,
-        count: n,
-      })),
-    { id: "weekly" as Filter, label: "Every week", count: count("weekly") },
-    { id: "manual" as Filter, label: "Added by hand", count: count("manual") },
-  ].filter((f) => f.count > 0)
-}
-
-/** A card for each list: what's left, about what it costs, and how to shop it. */
-function StoreCards({
-  lists,
-  items,
-  prices,
-  current,
-  split,
-  onChoose,
-  onManage,
-}: {
-  lists: ShoppingList[]
-  items: ShoppingItem[]
-  prices: ListPrices
-  current: string
-  split: boolean
-  onChoose: (id: string) => void
-  onManage: () => void
-}) {
-  const banner = useShopStatus().data?.kroger.store?.banner ?? SHOP_NAMES.kroger
-  const unused = SHOPS.filter(
-    (shop) => !lists.some((list) => list.store === shop)
-  ).map((shop) => (shop === "kroger" ? banner : SHOP_NAMES[shop]))
-  const others =
-    unused.length > 1
-      ? `${unused.slice(0, -1).join(", ")} or ${unused.at(-1)}`
-      : unused[0]
-  return (
-    <div
-      role={split ? "tablist" : undefined}
-      aria-label="Lists"
-      className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3"
-    >
-      {lists.map((list) => {
-        const own = split
-          ? items.filter((item) => item.listId === list.id)
-          : items
-        return (
-          <StoreCard
-            key={list.id}
-            list={list}
-            items={own}
-            prices={prices}
-            selected={split && list.id === current}
-            split={split}
-            onChoose={() => onChoose(list.id)}
-          />
-        )
-      })}
-      {lists.length < 4 && (
-        <button
-          type="button"
-          onClick={onManage}
-          className="grid w-64 shrink-0 snap-start content-start gap-1.5 rounded-3xl border border-dashed p-5 text-left text-muted-foreground transition-colors outline-none hover:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:w-auto"
-        >
-          <span className="flex items-center gap-1.5 font-heading text-xl font-semibold text-foreground">
-            <HugeiconsIcon
-              icon={Add01Icon}
-              strokeWidth={2}
-              className="size-5"
-            />
-            {split ? "Another store" : "Split by store"}
-          </span>
-          <span className="text-sm">
-            {!split
-              ? `Send meat and drinks to Costco, say, and everything else to ${banner}.`
-              : others
-                ? `Split off ${others}, with the aisles that go there.`
-                : "Another list, with the aisles that go there."}
-          </span>
-        </button>
-      )}
-    </div>
-  )
-}
-
-function StoreCard({
-  list,
-  items,
-  prices,
-  selected,
-  split,
-  onChoose,
-}: {
-  list: ShoppingList
-  items: ShoppingItem[]
-  prices: ListPrices
-  selected: boolean
-  split: boolean
-  onChoose: () => void
-}) {
-  const kroger = useShopStatus().data?.kroger
-  const left = items.filter((item) => !item.checked)
-  const got = items.length - left.length
-  const costs = left.flatMap((item) => {
-    const price = prices[item.id]
-    return price ? [price.total] : []
-  })
-  const total = costs.reduce((sum, cost) => sum + cost, 0)
-  const sales = left.flatMap((item) => {
-    const saved = prices[item.id]?.saved
-    return saved ? [saved] : []
-  })
-  const saved = sales.reduce((sum, value) => sum + value, 0)
-
-  // Where it's shopped: its store, or any for a list without one.
-  const actions: { to: string; label: string }[] = []
-  const stores = list.store ? [list.store] : (["kroger", "costco"] as const)
-  for (const store of stores) {
-    if (store === "kroger") {
-      if (kroger?.store) {
-        actions.push({
-          to: "/list/shop",
-          label: `Send to the ${kroger.store.banner} cart`,
-        })
-      } else if (kroger?.ready) {
-        actions.push({
-          to: "/settings#connections",
-          label: "Connect your Kroger store",
-        })
-      }
-    } else if (store === "costco") {
-      actions.push({ to: "/list/costco", label: "Find each at Costco" })
-    } else {
-      actions.push({
-        to: "/settings#extension",
-        label: "Fill the cart with the Nourvio extension",
-      })
-    }
-  }
-
-  const linked =
-    list.store === "kroger" && kroger?.linked && !kroger.needsRelink
-  const body = (
-    <>
-      <span className="flex items-center justify-between gap-2">
-        <span className="truncate font-heading text-xl font-semibold">
-          {list.name}
-        </span>
-        {linked && (
-          <span className="shrink-0 rounded-full bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground">
-            Linked
-          </span>
-        )}
-      </span>
-      <span className="text-sm text-muted-foreground">
-        {left.length ? `${left.length} left` : "Nothing left"}
-        {got > 0 && ` · ${got} in the cart`}
-        {costs.length > 0 && (
-          <>
-            {" · "}
-            <span className="font-medium text-foreground">
-              about {money(total)}
-            </span>
-            {costs.length < left.length &&
-              ` for ${costs.length} of ${left.length}`}
-          </>
-        )}
-      </span>
-      {saved > 0 && (
-        <span className="text-sm font-medium text-primary">
-          Saving about {money(saved)} with {sales.length}{" "}
-          {sales.length === 1 ? "sale" : "sales"}
-        </span>
-      )}
-      <Progress
-        value={items.length ? (got / items.length) * 100 : 0}
-        aria-label={`${got} of ${items.length} in the cart`}
-        className="h-1.5"
+      <FoodsDialog open={foods} onOpenChange={setFoods} />
+      <FindProductDialog finding={finding} onClose={() => setFinding(null)} />
+      <ListsDialog
+        open={managing}
+        onOpenChange={setManaging}
+        lists={lists}
+        aisles={aisles}
+      />
+      <EditItemDialog
+        item={editing}
+        items={all}
+        aisles={aisles}
+        lists={lists}
+        onClose={() => setEditing(null)}
       />
     </>
   )
-
-  return (
-    <div
-      className={cn(
-        "relative grid w-64 shrink-0 snap-start content-start gap-2.5 rounded-3xl border bg-card p-5 text-card-foreground sm:w-auto",
-        selected && "border-primary ring-1 ring-primary"
-      )}
-    >
-      {split ? (
-        // The whole card picks the list; its links sit above.
-        <button
-          type="button"
-          role="tab"
-          aria-selected={selected}
-          onClick={onChoose}
-          className="grid gap-2.5 text-left outline-none after:absolute after:inset-0 after:rounded-3xl focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
-        >
-          {body}
-        </button>
-      ) : (
-        <div className="grid gap-2.5">{body}</div>
-      )}
-      {left.length > 0 &&
-        actions.map((action) => (
-          <Link
-            key={action.to}
-            to={action.to}
-            className="relative z-10 flex items-center gap-1 justify-self-start text-sm font-semibold text-primary hover:underline"
-          >
-            {action.label}
-            <HugeiconsIcon
-              icon={ArrowRight01Icon}
-              strokeWidth={2}
-              className="size-4"
-            />
-          </Link>
-        ))}
-    </div>
-  )
-}
-
-function QuickAdd({ list }: { list?: ShoppingList }) {
-  const add = useAddListItem()
-  const [text, setText] = React.useState("")
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        if (!text.trim()) return
-        add.mutate(
-          { text: text.trim(), listId: list?.id },
-          {
-            onSuccess: () => setText(""),
-            onError: (error) =>
-              toast.error(
-                error instanceof ApiError ? error.message : "Couldn't add that"
-              ),
-          }
-        )
-      }}
-    >
-      <InputGroup>
-        <InputGroupInput
-          placeholder={
-            list
-              ? `Add to ${list.name}, like “2 lb ground beef” or “paper towels”`
-              : "Add an item, like “2 lb ground beef” or “paper towels”"
-          }
-          aria-label={list ? `Add to ${list.name}` : "Add an item"}
-          enterKeyHint="done"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-        />
-        <InputGroupAddon align="inline-end">
-          <InputGroupButton
-            type="submit"
-            size="icon-xs"
-            variant="default"
-            aria-label="Add"
-            disabled={!text.trim() || add.isPending}
-          >
-            <HugeiconsIcon icon={Add01Icon} strokeWidth={2} />
-          </InputGroupButton>
-        </InputGroupAddon>
-      </InputGroup>
-    </form>
-  )
-}
-
-/**
- * "Fry's price on Oct 14, for 2 × Great Value Diced Tomatoes. On sale
- * through Tue. Usually $4.29 each."
- */
-function priceNote(price: ItemPrice) {
-  const packs = price.packages > 1 ? `${price.packages} × ` : ""
-  const guess = price.sure ? "" : " (a guess at how many)"
-  return [
-    `${SHOP_NAMES[price.shop]} price on ${monthDay(price.seenAt.slice(0, 10))}, for ${packs}${price.product}${guess}.`,
-    price.sale &&
-      `On sale${price.saleEnds ? ` ${saleThrough(price.saleEnds)}` : ""}.`,
-    price.usual !== null &&
-      `Usually ${money(price.usual)}${price.packages > 1 ? " each" : ""}.`,
-  ]
-    .filter(Boolean)
-    .join(" ")
 }
 
 /** "Jamie is on the list too": shopping together, changes show up live. */
 function ShoppingWith({ people }: { people: Person[] }) {
-  const names = people.map((person) => person.name)
-  const who =
-    names.length <= 2
-      ? names.join(" and ")
-      : `${names.slice(0, 2).join(", ")} and ${names.length - 2} more`
+  const { t, i18n } = useTranslation()
+  const named = people.slice(0, 3).map((person) => person.name)
+  const names = new Intl.ListFormat(i18n.language, {
+    type: "conjunction",
+  }).format(
+    people.length > 3
+      ? [...named.slice(0, 2), t("list.andMore", { count: people.length - 2 })]
+      : named
+  )
   return (
     <p
       role="status"
@@ -909,9 +598,12 @@ function ShoppingWith({ people }: { people: Person[] }) {
         ))}
       </span>
       <span>
-        <span className="font-medium">{who}</span>{" "}
-        {people.length === 1 ? "is" : "are"} on the list too. Changes show up as
-        you go.
+        <Trans
+          i18nKey="list.together"
+          count={people.length}
+          values={{ names }}
+          components={{ b: <span className="font-medium" /> }}
+        />
       </span>
       <span className="relative flex size-2 shrink-0">
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-60 motion-reduce:hidden" />
@@ -921,136 +613,184 @@ function ShoppingWith({ people }: { people: Person[] }) {
   )
 }
 
-function ItemRow({
-  item,
-  price,
-  priced,
-  onEdit,
-  select,
+/** A card for each list, to pick which shows; and one to split by store. */
+function StoreCards({
+  lists,
+  items,
+  current,
+  split,
+  admin,
+  priceOf,
+  currency,
+  onChoose,
+  onManage,
 }: {
-  item: ShoppingItem
-  price?: ItemPrice
-  /** Whether anything on this list has a price, so the column lines up. */
-  priced: boolean
-  onEdit: () => void
-  select?: RowSelect
+  lists: readonly List[]
+  items: readonly ListItem[]
+  current: string
+  split: boolean
+  admin: boolean
+  priceOf: (item: ListItem) => ItemPrice | null
+  currency: string
+  onChoose: (id: string) => void
+  onManage: () => void
 }) {
-  const update = useUpdateListItem()
-  const press = useLongPress(
-    () => select?.onLongPress(),
-    Boolean(select && !select.selecting)
-  )
-  const selecting = select?.selecting ?? false
-  const badges: { text: string; kind: "sale" | "meal" | "weekly" }[] =
-    item.checked
-      ? []
-      : [
-          ...(price?.sale
-            ? [
-                {
-                  text: price.saved
-                    ? `Sale · save ${money(price.saved)}`
-                    : "On sale",
-                  kind: "sale" as const,
-                },
-              ]
-            : []),
-          ...item.recipes.map((name) => ({
-            text: `For ${name}`,
-            kind: "meal" as const,
-          })),
-          ...(item.source === "weekly"
-            ? [{ text: "Every week", kind: "weekly" as const }]
-            : []),
-        ]
-  // A narrow card: badges under the name. A wide one: all in a line.
+  const { t, i18n } = useTranslation()
+  const money = (cents: number) => formatPrice(cents, currency, i18n.language)
   return (
-    <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-3.5 gap-y-1 py-3 @2xl:grid-cols-[auto_minmax(0,1fr)_auto_auto] @2xl:gap-x-4">
-      {selecting ? (
-        // The name below is the button; the box is a bigger place to tap.
-        <span
-          onClick={select?.onToggle}
-          className={cn(
-            "col-start-1 row-start-1 cursor-pointer",
-            badges.length > 0 && "row-span-2 @2xl:row-span-1"
-          )}
-        >
-          <SelectMark picked={select?.picked ?? false} />
-        </span>
-      ) : (
-        <Checkbox
-          className={cn(
-            "col-start-1 row-start-1 size-6 rounded-md",
-            badges.length > 0 && "row-span-2 @2xl:row-span-1"
-          )}
-          checked={item.checked}
-          aria-label={`${item.checked ? "Uncheck" : "Check off"} ${item.name}`}
-          onCheckedChange={(on) =>
-            update.mutate({ id: item.id, checked: on === true })
-          }
-        />
-      )}
-      <button
-        type="button"
-        onClick={selecting ? select?.onToggle : onEdit}
-        {...(selecting ? {} : press)}
-        className={cn(
-          "col-start-2 row-start-1 flex min-w-0 items-baseline gap-1.5 rounded-md text-left outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-          item.checked && !selecting && "text-muted-foreground line-through"
-        )}
-        aria-pressed={selecting ? select?.picked : undefined}
-        aria-label={
-          selecting
-            ? `${select?.picked ? "Unselect" : "Select"} ${item.name}`
-            : `Edit ${item.name}`
-        }
-      >
-        <span className="truncate font-medium first-letter:uppercase">
-          {item.name}
-        </span>
-        {item.amount && (
-          <span className="shrink-0 text-muted-foreground">
-            · {item.amount}
-          </span>
-        )}
-      </button>
-      {badges.length > 0 && (
-        <div className="col-start-2 row-start-2 flex min-w-0 flex-wrap gap-1.5 @2xl:col-start-3 @2xl:row-start-1 @2xl:max-w-sm @2xl:justify-end">
-          {badges.map((badge) => (
-            <span
-              key={badge.text}
-              className={cn(
-                "inline-block max-w-full truncate rounded-full px-2.5 py-0.5 text-xs font-medium",
-                badge.kind === "sale"
-                  ? "bg-primary/10 text-primary"
-                  : badge.kind === "meal"
-                    ? "bg-accent text-accent-foreground"
-                    : "bg-secondary text-muted-foreground"
-              )}
-            >
-              {badge.text}
+    <div
+      role={split ? "tablist" : undefined}
+      aria-label={t("list.cards.label")}
+      className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-3"
+    >
+      {lists.map((list) => {
+        const own = split
+          ? items.filter((item) => item.list === list.id)
+          : items
+        const toGet = own.filter((item) => !item.checked)
+        const left = toGet.length
+        const got = own.length - left
+        const costs = toGet.flatMap((item) => priceOf(item) ?? [])
+        const total = costs.reduce((sum, cost) => sum + cost.total, 0)
+        const sales = costs.flatMap((cost) => cost.sale ?? [])
+        const saved = sales.reduce((sum, sale) => sum + sale.saved, 0)
+        const selected = split && list.id === current
+        const body = (
+          <>
+            <span className="truncate font-heading text-xl font-semibold">
+              {list.name}
             </span>
-          ))}
-        </div>
-      )}
-      {priced && (
-        <span
-          className={cn(
-            "col-start-3 row-start-1 min-w-14 text-right text-sm text-muted-foreground tabular-nums @2xl:col-start-4",
-            badges.length > 0 && "row-span-2 @2xl:row-span-1",
-            price?.sale && "font-medium text-primary"
-          )}
-          title={price ? priceNote(price) : undefined}
+            <span className="text-sm text-muted-foreground">
+              {left > 0
+                ? t("list.cards.left", { count: left })
+                : t("list.cards.nothingLeft")}
+              {got > 0 && ` · ${t("list.cards.inCart", { count: got })}`}
+              {costs.length > 0 && (
+                <>
+                  {" · "}
+                  <span className="font-medium text-foreground">
+                    {costs.length < left
+                      ? t("list.cards.aboutSome", {
+                          total: money(total),
+                          priced: costs.length,
+                          left,
+                        })
+                      : t("list.cards.about", { total: money(total) })}
+                  </span>
+                </>
+              )}
+            </span>
+            {saved > 0 && (
+              <span className="text-sm font-medium text-primary">
+                {t("list.cards.saving", {
+                  saved: money(saved),
+                  count: sales.length,
+                })}
+              </span>
+            )}
+            <Progress
+              value={own.length ? (got / own.length) * 100 : 0}
+              aria-label={t("list.cards.progress", { got, total: own.length })}
+              className="h-1.5"
+            />
+          </>
+        )
+        return (
+          <div
+            key={list.id}
+            className={cn(
+              "relative grid w-64 shrink-0 snap-start content-start gap-2.5 rounded-3xl border bg-card p-5 text-card-foreground sm:w-auto",
+              selected && "border-primary ring-1 ring-primary"
+            )}
+          >
+            {split ? (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                onClick={() => onChoose(list.id)}
+                className="grid gap-2.5 text-left outline-none after:absolute after:inset-0 after:rounded-3xl focus-visible:after:ring-[3px] focus-visible:after:ring-ring/50"
+              >
+                {body}
+              </button>
+            ) : (
+              <div className="grid gap-2.5">{body}</div>
+            )}
+          </div>
+        )
+      })}
+      {admin && lists.length < 4 && (
+        <button
+          type="button"
+          onClick={onManage}
+          className="grid w-64 shrink-0 snap-start content-start gap-1.5 rounded-3xl border border-dashed p-5 text-left text-muted-foreground transition-colors outline-none hover:bg-muted/40 focus-visible:ring-[3px] focus-visible:ring-ring/50 sm:w-auto"
         >
-          {price ? (
-            <>
-              {price.sure ? "" : "~"}
-              {money(price.total)}
-              {price.sale && <span className="sr-only"> on sale</span>}
-            </>
-          ) : null}
-        </span>
+          <span className="flex items-center gap-1.5 font-heading text-xl font-semibold text-foreground">
+            <HugeiconsIcon
+              icon={Add01Icon}
+              strokeWidth={2}
+              className="size-5"
+            />
+            {split ? t("list.cards.another") : t("list.cards.split")}
+          </span>
+          <span className="text-sm">
+            {split ? t("list.cards.anotherHint") : t("list.cards.splitHint")}
+          </span>
+        </button>
       )}
-    </li>
+    </div>
+  )
+}
+
+/** Type something onto the list showing: "2 lb ground beef" or "paper towels". */
+function QuickAdd({ list }: { list?: List }) {
+  const { t } = useTranslation()
+  const actions = useListActions()
+  const [text, setText] = React.useState("")
+  const [busy, setBusy] = React.useState(false)
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault()
+        const typed = text.trim()
+        if (!typed) return
+        setBusy(true)
+        void actions
+          .add({ text: typed, ...(list ? { list: list.id } : {}) })
+          .then((added) => {
+            setBusy(false)
+            if (added) setText("")
+          })
+      }}
+    >
+      <InputGroup>
+        <InputGroupInput
+          placeholder={
+            list ? t("list.addTo", { list: list.name }) : t("list.add")
+          }
+          aria-label={
+            list
+              ? t("list.addToLabel", { list: list.name })
+              : t("list.addLabel")
+          }
+          enterKeyHint="done"
+          maxLength={200}
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+        />
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            type="submit"
+            size="icon-xs"
+            variant="default"
+            aria-label={t("list.addButton")}
+            disabled={!text.trim() || busy}
+          >
+            <HugeiconsIcon icon={Add01Icon} strokeWidth={2} />
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+    </form>
   )
 }

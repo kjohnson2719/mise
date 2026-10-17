@@ -1,22 +1,23 @@
 import { resolve } from "node:path"
 import tailwindcss from "@tailwindcss/vite"
+import { tanstackRouter } from "@tanstack/router-plugin/vite"
 import react from "@vitejs/plugin-react"
 import { defineConfig } from "vite"
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    // Must come before React: it writes src/routeTree.gen.ts from src/routes.
+    tanstackRouter({ target: "react", autoCodeSplitting: true }),
+    react(),
+    tailwindcss(),
+  ],
   resolve: {
-    alias: {
-      "@": resolve(import.meta.dirname, "./src"),
-    },
+    alias: { "@": resolve(import.meta.dirname, "./src") },
   },
   server: {
-    // The API runs separately in development (apps/server on :3000).
-    proxy: {
-      // Keep the browser's host, so links Nourvio makes (like Kroger's sign-in
-      // return address) point back here.
-      "/api": { target: "http://localhost:3000", xfwd: true },
-    },
+    // The API runs on its own in development (apps/server on :3000).
+    // xfwd keeps the browser's address, so links the API makes (invite
+    // links) point back here.
+    proxy: { "/api": { target: "http://localhost:3000", xfwd: true } },
   },
 })

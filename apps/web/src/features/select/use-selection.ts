@@ -1,10 +1,8 @@
 import * as React from "react"
 
 /**
- * Select mode for a page of things (recipes, list items, pantry items,
- * meals): which ids are picked. Escape or leaving the page ends it. While
- * it's on, the page is marked so the chat button steps aside for the
- * action bar.
+ * Select mode for a page of things (recipes now; list items, pantry items
+ * and meals later): which ids are picked. Escape or leaving the page ends it.
  */
 export function useSelection() {
   const [selecting, setSelecting] = React.useState(false)
@@ -17,45 +15,45 @@ export function useSelection() {
 
   React.useEffect(() => {
     if (!selecting) return
-    const root = document.documentElement
-    root.dataset.selecting = "true"
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape" && !document.querySelector("[role=dialog]")) {
         done()
       }
     }
     window.addEventListener("keydown", onKey)
-    return () => {
-      delete root.dataset.selecting
-      window.removeEventListener("keydown", onKey)
-    }
+    return () => window.removeEventListener("keydown", onKey)
   }, [selecting, done])
 
+  /** Starts selecting, with this one picked when given (a long press). */
   const start = React.useCallback((id?: string) => {
     setSelecting(true)
     setPicked(id ? new Set([id]) : new Set())
   }, [])
+
   const toggle = React.useCallback(
     (id: string) =>
       setPicked((current) => {
         const next = new Set(current)
-        if (next.has(id)) next.delete(id)
-        else next.add(id)
+        if (!next.delete(id)) next.add(id)
         return next
       }),
     []
   )
+
+  /** Picks all of these, or none when they're all picked already. */
   const toggleAll = React.useCallback(
-    (ids: string[]) =>
+    (ids: readonly string[]) =>
       setPicked((current) =>
-        ids.length && ids.every((id) => current.has(id))
+        ids.length > 0 && ids.every((id) => current.has(id))
           ? new Set()
           : new Set(ids)
       ),
     []
   )
+
+  /** Leaves out what's no longer there (deleted, or filtered away). */
   const keepOnly = React.useCallback(
-    (ids: string[]) =>
+    (ids: readonly string[]) =>
       setPicked((current) => {
         const there = new Set(ids)
         const next = new Set([...current].filter((id) => there.has(id)))
@@ -69,12 +67,9 @@ export function useSelection() {
     picked,
     count: picked.size,
     isPicked: (id: string) => picked.has(id),
-    /** Starts selecting, with this one picked when given (a long-press). */
     start,
     toggle,
-    /** Picks all of these, or none when they're all picked already. */
     toggleAll,
-    /** Leaves out what's no longer there (removed, or filtered away). */
     keepOnly,
     done,
   }
@@ -82,19 +77,31 @@ export function useSelection() {
 
 export type Selection = ReturnType<typeof useSelection>
 
+/** Keeps the picks to what the page is showing. */
+export function useSelectionKeepOnly(
+  selection: Selection,
+  ids: readonly string[]
+) {
+  const key = ids.join(",")
+  const { keepOnly } = selection
+  React.useEffect(() => {
+    keepOnly(key ? key.split(",") : [])
+  }, [key, keepOnly])
+}
+
 /**
  * A long press (half a second, without moving) on a touch screen, which
- * starts selecting with that item. A mouse uses the Select button.
+ * starts selecting with that thing. A mouse uses the Select button.
  */
 export function useLongPress(onLongPress: () => void, enabled = true) {
   const timer = React.useRef<number | null>(null)
-  const start = React.useRef<{ x: number; y: number } | null>(null)
+  const from = React.useRef<{ x: number; y: number } | null>(null)
   const fired = React.useRef(false)
 
   const cancel = () => {
     if (timer.current !== null) window.clearTimeout(timer.current)
     timer.current = null
-    start.current = null
+    from.current = null
   }
 
   if (!enabled) return {}
@@ -102,7 +109,7 @@ export function useLongPress(onLongPress: () => void, enabled = true) {
     onPointerDown: (event: React.PointerEvent) => {
       if (event.pointerType === "mouse") return
       fired.current = false
-      start.current = { x: event.clientX, y: event.clientY }
+      from.current = { x: event.clientX, y: event.clientY }
       timer.current = window.setTimeout(() => {
         fired.current = true
         navigator.vibrate?.(10)
@@ -110,18 +117,18 @@ export function useLongPress(onLongPress: () => void, enabled = true) {
       }, 500)
     },
     onPointerMove: (event: React.PointerEvent) => {
-      if (!start.current) return
+      if (!from.current) return
       const moved =
-        Math.abs(event.clientX - start.current.x) +
-        Math.abs(event.clientY - start.current.y)
+        Math.abs(event.clientX - from.current.x) +
+        Math.abs(event.clientY - from.current.y)
       if (moved > 10) cancel()
     },
     onPointerUp: cancel,
     onPointerCancel: cancel,
     onContextMenu: (event: React.MouseEvent) => {
-      if (start.current || fired.current) event.preventDefault()
+      if (from.current || fired.current) event.preventDefault()
     },
-    /** Swallows the click that ends a long press, so it doesn't open the item. */
+    /** Swallows the click that ends a long press, so it doesn't open the thing. */
     onClickCapture: (event: React.MouseEvent) => {
       if (fired.current) {
         event.preventDefault()

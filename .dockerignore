@@ -1,16 +1,19 @@
 **/node_modules
 **/dist
+**/coverage
 **/*.tsbuildinfo
+# Where Merran keeps its data while developing, not the code's data
+# (packages/shared/src/foods/data is the food vocabulary).
+data
+apps/server/data
 .git
 .github
 .claude
 .vscode
 docs
-data
-backups
 .env
 .env.*
 *.log
+*.local
 **/*.test.ts
 apps/server/src/test
-apps/extension/release

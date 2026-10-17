@@ -1,14 +1,7 @@
-import * as React from "react"
 import { HugeiconsIcon, type IconSvgElement } from "@hugeicons/react"
-import { MoreHorizontalIcon } from "@hugeicons/core-free-icons"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
 import type { Selection } from "./use-selection"
@@ -18,132 +11,87 @@ export type SelectionAction = {
   icon?: IconSvgElement
   onSelect: () => void
   destructive?: boolean
-  disabled?: boolean
 }
 
-/**
- * "4 selected · Select all · Done", in place of a page's own header
- * buttons while selecting.
- */
+/** "4 selected · Select all · Done", in place of a page's own header buttons while selecting. */
 export function SelectionHeader({
   selection,
   allIds,
 }: {
   selection: Selection
   /** Everything showing, for Select all. */
-  allIds: string[]
+  allIds: readonly string[]
 }) {
+  const { t } = useTranslation()
   const all = allIds.length > 0 && allIds.every((id) => selection.isPicked(id))
   return (
     <div className="flex flex-wrap items-center gap-2">
       <span className="px-1 text-base font-semibold" aria-live="polite">
-        {selection.count ? `${selection.count} selected` : "Select some"}
+        {selection.count > 0
+          ? t("select.selected", { count: selection.count })
+          : t("select.pickSome")}
       </span>
       <Button
         variant="outline"
-        disabled={!allIds.length}
+        disabled={allIds.length === 0}
         onClick={() => selection.toggleAll(allIds)}
       >
-        {all ? "Select none" : `Select all ${allIds.length}`}
+        {all
+          ? t("select.selectNone")
+          : t("select.selectAll", { count: allIds.length })}
       </Button>
       <Button variant="secondary" onClick={selection.done}>
-        Done
+        {t("select.done")}
       </Button>
     </div>
   )
 }
 
 /**
- * The actions for what's selected, in a bar at the bottom of the screen
- * (above the tabs on a phone): the main ones as buttons, the rest under
- * More.
+ * The actions for what's picked, in a bar at the foot of the screen (above
+ * the tabs on a phone).
  */
 export function SelectionBar({
   selection,
   actions,
-  more = [],
 }: {
   selection: Selection
   actions: SelectionAction[]
-  more?: SelectionAction[]
 }) {
+  const { t } = useTranslation()
   if (!selection.selecting) return null
   const none = selection.count === 0
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-3 md:bottom-6">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex justify-center px-3 md:bottom-6">
       <div
         role="toolbar"
-        aria-label={`Actions for ${selection.count} selected`}
+        aria-label={t("select.actions", { count: selection.count })}
         className="pointer-events-auto flex max-w-full items-center gap-1 overflow-x-auto rounded-full bg-foreground p-1.5 text-background shadow-2xl"
       >
         {actions.map((action) => (
-          <BarButton key={action.label} action={action} disabled={none} />
+          <Button
+            key={action.label}
+            variant="ghost"
+            disabled={none}
+            onClick={action.onSelect}
+            className={cn(
+              "shrink-0 rounded-full text-background hover:bg-background/15 hover:text-background",
+              action.destructive &&
+                "text-red-300 hover:text-red-200 dark:text-red-700 dark:hover:text-red-800"
+            )}
+          >
+            {action.icon && (
+              <HugeiconsIcon
+                icon={action.icon}
+                strokeWidth={2}
+                data-icon="inline-start"
+              />
+            )}
+            {action.label}
+          </Button>
         ))}
-        {more.length > 0 && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                disabled={none}
-                className="shrink-0 rounded-full text-background hover:bg-background/15 hover:text-background"
-              >
-                <HugeiconsIcon
-                  icon={MoreHorizontalIcon}
-                  strokeWidth={2}
-                  data-icon="inline-start"
-                />
-                More
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" side="top">
-              {more.map((action) => (
-                <DropdownMenuItem
-                  key={action.label}
-                  disabled={action.disabled}
-                  variant={action.destructive ? "destructive" : "default"}
-                  onSelect={action.onSelect}
-                >
-                  {action.icon && (
-                    <HugeiconsIcon icon={action.icon} strokeWidth={2} />
-                  )}
-                  {action.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
       </div>
     </div>
-  )
-}
-
-function BarButton({
-  action,
-  disabled,
-}: {
-  action: SelectionAction
-  disabled: boolean
-}) {
-  return (
-    <Button
-      variant="ghost"
-      disabled={disabled || action.disabled}
-      onClick={action.onSelect}
-      className={cn(
-        "shrink-0 rounded-full text-background hover:bg-background/15 hover:text-background",
-        action.destructive &&
-          "text-red-300 hover:text-red-200 dark:text-red-700 dark:hover:text-red-800"
-      )}
-    >
-      {action.icon && (
-        <HugeiconsIcon
-          icon={action.icon}
-          strokeWidth={2}
-          data-icon="inline-start"
-        />
-      )}
-      {action.label}
-    </Button>
   )
 }
 
@@ -155,21 +103,14 @@ export function SelectButton({
   selection: Selection
   disabled?: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <Button
       variant="outline"
       disabled={disabled}
       onClick={() => selection.start()}
     >
-      Select
+      {t("select.start")}
     </Button>
   )
-}
-
-export function useSelectionKeepOnly(selection: Selection, ids: string[]) {
-  const key = ids.join(",")
-  const { keepOnly } = selection
-  React.useEffect(() => {
-    keepOnly(key ? key.split(",") : [])
-  }, [key, keepOnly])
 }

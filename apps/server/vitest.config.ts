@@ -1,18 +1,18 @@
-import { tmpdir } from "node:os"
-import { join } from "node:path"
-
 import { defineConfig } from "vitest/config"
 
+// Every test runs on SQLite. `pnpm test:all` runs them on Postgres too, against
+// the server from `pnpm db:test-postgres` (or MERRAN_TEST_POSTGRES_URL).
 export default defineConfig({
   test: {
-    environment: "node",
-    include: ["src/**/*.test.ts"],
-    // Each test file starts an in-memory Postgres and runs the migrations.
-    testTimeout: 30_000,
-    hookTimeout: 30_000,
-    env: {
-      // Uploaded photos go to a throwaway folder.
-      DATA_DIR: join(tmpdir(), `mise-test-${process.pid}`),
-    },
+    projects: [
+      {
+        extends: true,
+        test: { name: "sqlite", env: { MERRAN_TEST_DB: "sqlite" } },
+      },
+      {
+        extends: true,
+        test: { name: "postgres", env: { MERRAN_TEST_DB: "postgres" } },
+      },
+    ],
   },
 })
