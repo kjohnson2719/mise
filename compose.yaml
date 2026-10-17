@@ -5,6 +5,9 @@
 #   docker compose --profile postgres up -d    on Postgres: set POSTGRES_PASSWORD
 #                                              and DATABASE_URL in .env first
 #
+# Add --profile voice for Kokoro, a voice for the cook view, and --profile
+# tunnel for a Cloudflare Tunnel; more than one profile works too.
+#
 # Everything Merran keeps is in ./data, next to this file. Back that up.
 
 services:
@@ -44,3 +47,27 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  # Kokoro, an open voice model, reads cook steps aloud: free, the same on
+  # every device, and nothing leaves the server. It needs 1 to 2 GB of RAM.
+  # Then set its address, http://kokoro:8880, in Settings → This server →
+  # Voice (or MERRAN_KOKORO_URL in .env).
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    profiles: [voice]
+    restart: unless-stopped
+    # No published ports: only Merran talks to it.
+
+  # A Cloudflare Tunnel, for reaching Merran from outside without opening a
+  # port. Make a tunnel in Cloudflare's dashboard, point its public hostname
+  # at http://merran:3000, and set CLOUDFLARE_TUNNEL_TOKEN (and
+  # MERRAN_PUBLIC_URL) in .env.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: [tunnel]
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - merran
