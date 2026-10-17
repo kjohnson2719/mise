@@ -83,7 +83,7 @@ async function week(from = ahead) {
   }[]
 }
 
-/** As if the autoplan's time had come, for a week it hasn't planned. */
+/** As if the autoplan's time had come today, for a week it hasn't planned. */
 async function timeComes() {
   const em = forHousehold(database.em.fork(), householdId)
   const household = await em.findOneOrFail(Household, { id: householdId })
@@ -92,13 +92,15 @@ async function timeComes() {
     autoplan: { ...household.settings!.autoplan!, last: null },
   }
   await em.flush()
-  await hurry()
+  await hurry(today)
 }
 
 /**
- * Runs the waiting run now, or as if it was meant for a day gone by. Under
- * a key of its own: a real run's next is a week on, but one hurried would
- * come round to the same time and key.
+ * Runs the waiting run now, or as if it was meant for another day. Today's
+ * plans the week ahead; the one waiting, next Saturday's, plans the week
+ * after it from Saturday at 9 through Monday. Under a key of its own: a
+ * real run's next is a week on, but one hurried would come round to the
+ * same time and key.
  */
 async function hurry(meantFor?: string) {
   const em = forHousehold(database.em.fork(), householdId)
@@ -266,7 +268,7 @@ describe("the autoplan", () => {
     expect(await waiting()).toHaveLength(1)
 
     // Its time again, the same week: planned already.
-    await hurry()
+    await hurry(today)
     expect(await lastResult()).toEqual({ skipped: "planned already" })
     expect(await week()).toHaveLength(7)
     await save({ enabled: false })
@@ -316,7 +318,7 @@ describe("the autoplan", () => {
     expect(await week()).toHaveLength(7)
     // Turned on, its time comes for that week: planned already.
     await save({})
-    await hurry()
+    await hurry(today)
     expect((await autoplan()).last).toMatchObject({ week: ahead, planned: 7 })
     expect(await week()).toHaveLength(7)
     await save({ enabled: false })
