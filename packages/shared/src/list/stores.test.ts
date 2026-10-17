@@ -1,11 +1,5 @@
 import { describe, expect, test } from "vitest"
-import {
-  storeNamed,
-  STORES,
-  STORES_BY_KEY,
-  storeSearch,
-  storesFor,
-} from "./stores.ts"
+import { STORES, STORES_BY_KEY, storeSearch, storesFor } from "./stores.ts"
 
 describe("stores", () => {
   test("are offered for the household's country, by name", () => {
@@ -59,20 +53,5 @@ describe("stores", () => {
         expect(search, store.key).toMatch(/^https:\/\/[^ ]+\{q\}/)
       }
     }
-  })
-
-  test("a list named for a store is that store's", () => {
-    expect(storeNamed("Walmart", "US")).toBe("walmart")
-    expect(storeNamed("costco run", "US")).toBe("costco")
-    expect(storeNamed("Trader Joes", "US")).toBe("trader-joes")
-    // The household's Kroger store, by its banner.
-    const banner = [{ key: "kroger", name: "Fry's" }]
-    expect(storeNamed("Frys", "US", banner)).toBe("kroger")
-    expect(storeNamed("Fry's Marketplace", "US", banner)).toBe("kroger")
-    // Whole words only, and only the country's stores.
-    expect(storeNamed("Targeted buys", "US")).toBeNull()
-    expect(storeNamed("Groceries", "US")).toBeNull()
-    expect(storeNamed("Tesco", "US")).toBeNull()
-    expect(storeNamed("Tesco", "GB")).toBe("tesco")
   })
 })

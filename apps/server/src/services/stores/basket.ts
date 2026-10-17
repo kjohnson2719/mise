@@ -13,7 +13,6 @@ import type { AppDeps } from "../../core/context.ts"
 import { AppError } from "../../core/errors.ts"
 import {
   ShoppingItem,
-  ShoppingList,
   StorePrice,
   StoreProduct,
   type StoreConnection,
@@ -67,39 +66,23 @@ export async function ready(deps: BasketDeps, em: EntityManager) {
 export const foodOf = (item: ShoppingItem) => item.foodKey ?? foodKey(item.name)
 
 /** How much of something the list says, as it shows it: "½ cup". */
-function amountOf(item: ShoppingItem) {
+export function amountOf(item: ShoppingItem) {
   // Doubles can come back as text from some databases.
   const quantity = item.quantity == null ? null : Number(item.quantity)
   return item.amountText ?? formatAmount(quantity, item.unit ?? null)
 }
 
 /**
- * What's left to get for a store: on one list, the one the person's
- * looking at (`listId`); without one, the store's own list, else the lists
- * for no store.
+ * What's left to get: just these things (`itemIds`: the ones Send has
+ * going to a store), or everything left on every list.
  */
 export async function itemsToGet(
   em: EntityManager,
-  store: string = KROGER,
-  listId?: string
+  itemIds?: readonly string[]
 ) {
-  let chosen: string[]
-  if (listId) {
-    const list = await em.findOne(ShoppingList, { id: listId })
-    if (!list) {
-      throw new AppError("not_found", "list_not_found", "There's no such list.")
-    }
-    chosen = [list.id]
-  } else {
-    const lists = await em.find(ShoppingList, {})
-    const forStore = lists.filter((list) => list.store === store)
-    chosen = (
-      forStore.length > 0 ? forStore : lists.filter((list) => !list.store)
-    ).map((list) => list.id)
-  }
   return em.find(
     ShoppingItem,
-    { list: { $in: chosen }, checked: false },
+    { ...(itemIds ? { id: { $in: [...itemIds] } } : {}), checked: false },
     { orderBy: { createdAt: "asc", id: "asc" } }
   )
 }
@@ -295,10 +278,10 @@ export async function krogerBasket(
   deps: BasketDeps,
   em: EntityManager,
   who: { householdId: string; userId: string | null },
-  listId?: string
+  itemIds?: readonly string[]
 ) {
   const { app, connection, location } = await ready(deps, em)
-  const items = await itemsToGet(em, KROGER, listId)
+  const items = await itemsToGet(em, itemIds)
   const foods = [...new Set(items.map(foodOf))]
   const kept = new Map(
     (await em.find(StoreProduct, { store: KROGER, food: { $in: foods } })).map(

@@ -68,11 +68,11 @@ export async function walmartBasket(
   deps: StoreDeps,
   em: EntityManager,
   householdId: string,
-  listId?: string
+  itemIds?: readonly string[]
 ) {
   await needWalmart(deps)
   const connection = await connectionOf(em, householdId, WALMART)
-  const items = await itemsToGet(em, WALMART, listId)
+  const items = await itemsToGet(em, itemIds)
   const kept = await keptFor(em, [...new Set(items.map(foodOf))])
   await em.flush()
   const sales = await judgeSales(

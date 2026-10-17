@@ -210,6 +210,12 @@
       }
     },
     "household": {
+      "yourStores": {
+        "title": "Your stores",
+        "description": "The stores you shop at, for Find on the list. Merran offers only these, however many it knows.",
+        "connected": "Merran can send to these, and pick their products:",
+        "others": "And the others you shop at, whose sites Find searches:"
+      },
       "tab": "Household",
       "planning": {
         "title": "Planning",
@@ -1701,9 +1707,9 @@
     },
     "lists": {
       "title": "Shopping lists",
-      "description": "A list for each store you shop at. Things go on the main list unless their aisle goes on another, or you’ve moved them there before.",
+      "description": "Lists for however you like to sort what you buy: a store, the corner shop, a party. Things go on the main list unless their aisle goes on another, or you’ve moved them there before. Which store each thing’s bought at is chosen with Find and Send.",
       "name": "List name",
-      "namePlaceholder": "Store name",
+      "namePlaceholder": "Costco, the corner shop…",
       "mainPlaceholder": "Groceries",
       "aisles": "Aisles that go on this list",
       "mainHint": "The main list: everything goes here unless an aisle or a move says otherwise.",
@@ -1714,10 +1720,7 @@
       "add": "Add a list",
       "movesHint": "Moving something to another list teaches Merran where that food goes from then on. Things on a removed list go to the main one.",
       "save": "Save",
-      "saved": "Lists saved.",
-      "store": "Store",
-      "anyStore": "Any store",
-      "storeTaken": "{{store}} (for {{name}})"
+      "saved": "Lists saved."
     },
     "clearListNamed": "Clear {{list}}",
     "clearCheckedOn": "Clear checked on {{list}}",
@@ -1742,9 +1745,13 @@
       "more_other": "Show {{count}} more",
       "fewer": "Show fewer"
     },
-    "find": "Find at {{store}}",
-    "findName": "Find {{name}} at {{store}}",
-    "sendTo": "Send to {{store}}",
+    "findMenu": "Find",
+    "findName": "Find {{name}} at one of your stores",
+    "findAtLabel": "Find {{name}} at",
+    "findPick": "Pick a product",
+    "findPicked": "Kept {{product}} for {{name}} at {{store}}.",
+    "findNoStores": "Add your stores in Settings, Household to find things there.",
+    "send": "Send",
     "foods": "Your own foods",
     "sameAs": {
       "label": "Same as",
@@ -1769,11 +1776,34 @@
       "forgetName": "Forget {{name}}"
     }
   },
+  "send": {
+    "title": "Send the list",
+    "titleFor": "Send {{list}}",
+    "description": "Each thing goes to the store you picked its product at, and the rest to the store you choose. Then review and send each store's part.",
+    "noStores": "There's no store Merran can send to yet: set up your Kroger store in Settings, Household, or ask the server admin to turn Walmart on.",
+    "nothing": "Nothing left to get on this list.",
+    "restTitle_one": "{{count}} thing isn't picked at a store yet",
+    "restTitle_other": "{{count}} things aren't picked at a store yet",
+    "restHint": "They go to this store, where Merran picks a product for each. Change any one below.",
+    "leaveOut": "Leave out",
+    "leftOut_one": "Left out: {{count}} thing",
+    "leftOut_other": "Left out: {{count}} things",
+    "leftOutHint": "Not sent anywhere this time: bought somewhere else, say.",
+    "partTitle_one": "{{store}}: {{count}} thing",
+    "partTitle_other": "{{store}}: {{count}} things",
+    "allSent": "All sent to {{store}}.",
+    "someSent_one": "{{count}} already sent to {{store}}.",
+    "someSent_other": "{{count}} already sent to {{store}}.",
+    "review": "Review {{store}}",
+    "pickedAtBoth": "Picked at {{stores}}",
+    "notPicked": "Not picked yet",
+    "sentBadge": "Sent",
+    "whereFor": "Where {{name}} goes"
+  },
   "stores": {
     "basket": {
       "title": "{{store}} cart",
       "description": "From the list at {{location}}, for {{where}}. Look it over, then send it to the cart and check out on Kroger's site.",
-      "descriptionFor": "From your {{list}} list, at {{location}}, for {{where}}. Look it over, then send it to the cart and check out on Kroger's site.",
       "pickup": "pickup",
       "delivery": "delivery",
       "loadingTitle": "Finding everything",
@@ -1817,7 +1847,6 @@
     "walmart": {
       "title": "Walmart cart",
       "description": "From the list. Merran's browser extension finds each thing and fills your cart in a Walmart tab of your own; you check out on Walmart's site.",
-      "descriptionFor": "From your {{list}} list. Merran's browser extension finds each thing and fills your cart in a Walmart tab of your own; you check out on Walmart's site.",
       "experimental": "Experimental",
       "setup": "Walmart has no way in for Merran, so the extension does it in your own browser: it finds things and fills your cart in a Walmart tab, as you would. Each step ticks itself off once it's done.",
       "access": {

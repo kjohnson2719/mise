@@ -2,8 +2,8 @@ import { z } from "@hono/zod-openapi"
 import { ITEM_SOURCES, MEALS } from "../../database/entities/index.ts"
 import { IDS, TIMES } from "./examples.ts"
 
-// The shopping lists: what to buy, by aisle, on the list for the store
-// it's bought at; from the plan, typed in, or every week.
+// The shopping lists: what to buy, by aisle, on whichever list the
+// household sorts it onto; from the plan, typed in, or every week.
 
 const Day = z
   .string()
@@ -85,14 +85,12 @@ const LISTS = [
   {
     id: IDS.shoppingList,
     name: "Shopping list",
-    store: null,
     main: true,
     aisles: [],
   },
   {
     id: IDS.costcoList,
     name: "Costco",
-    store: "costco",
     main: false,
     aisles: [IDS.aisles[1]],
   },
@@ -102,9 +100,6 @@ const ListSchema = z
   .object({
     id: z.string(),
     name: z.string(),
-    store: z.string().nullable().openapi({
-      description: 'The store it\'s for, like "costco"; null for any.',
-    }),
     main: z.boolean().openapi({
       description: "The main list, which takes what no other list does.",
     }),
@@ -159,7 +154,6 @@ export const ListsInputSchema = z
             description: "An existing list's id; none for a new one.",
           }),
           name: z.string().trim().min(1, "Name the list.").max(40),
-          store: z.string().max(40).nullable(),
           aisles: z.array(z.string()).max(40),
         })
       )
@@ -169,8 +163,8 @@ export const ListsInputSchema = z
   .openapi("ListsInput", {
     example: {
       lists: [
-        { id: IDS.shoppingList, name: "Groceries", store: null, aisles: [] },
-        { name: "Costco", store: "costco", aisles: [IDS.aisles[1]] },
+        { id: IDS.shoppingList, name: "Groceries", aisles: [] },
+        { name: "Costco", aisles: [IDS.aisles[1]] },
       ],
     },
   })

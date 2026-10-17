@@ -2,7 +2,6 @@ import { worthIt } from "@merran/shared"
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { useCapability } from "@/features/capabilities/queries"
-import { listQuery } from "@/features/list/queries"
 
 import { api, unwrap, type Schemas } from "@/lib/api/client"
 
@@ -15,6 +14,8 @@ export type Deals = Schemas["Deals"]
 export type RecipeSale = Deals["recipes"][string][number]
 export type ListPrices = Schemas["ListPrices"]
 export type ItemPrice = ListPrices["items"][string]
+export type YourStore = Schemas["YourStores"]["stores"][number]
+export type SendPlan = Schemas["SendPlan"]
 
 /** The household's stores with an API: its Kroger, and the linked account. */
 export const storesQuery = queryOptions({
@@ -25,18 +26,21 @@ export const storesQuery = queryOptions({
 /** Every list's cart at Kroger, to ask for again after a change. */
 const KROGER_BASKETS = ["stores", "kroger", "basket"] as const
 
+/** Things on the list by id, as the baskets take them. */
+const itemsQuery = (items: readonly string[] | undefined) =>
+  items && items.length > 0 ? { items: items.join(",") } : {}
+
 /**
- * What a list is at Kroger: a product for each thing, and how many. The
- * list the person's looking at; without one, Kroger's own list, else the
- * lists for no store.
+ * What things are at Kroger: a product for each, and how many. The ones
+ * Send has going to Kroger; without them, everything left on every list.
  */
-export const krogerBasketQuery = (list?: string) =>
+export const krogerBasketQuery = (items?: readonly string[]) =>
   queryOptions({
-    queryKey: [...KROGER_BASKETS, list ?? null],
+    queryKey: [...KROGER_BASKETS, items?.join(",") ?? null],
     queryFn: () =>
       unwrap(
         api.GET("/api/stores/kroger/basket", {
-          params: { query: list ? { list } : {} },
+          params: { query: itemsQuery(items) },
         })
       ),
     // Kroger's search and an AI pick: not something to redo on every focus.
@@ -45,28 +49,39 @@ export const krogerBasketQuery = (list?: string) =>
   })
 
 /**
- * What a list is at Walmart: the products kept and what's still to find,
- * which Merran's browser extension looks for. The list the person's
- * looking at, as with Kroger. Only what Merran has: cheap to ask again as
- * the extension moves on.
+ * What things are at Walmart: the products kept and what's still to find,
+ * which Merran's browser extension looks for. The ones Send has going to
+ * Walmart, as with Kroger. Only what Merran has: cheap to ask again as the
+ * extension moves on.
  */
-export const walmartBasketQuery = (list?: string) =>
+export const walmartBasketQuery = (items?: readonly string[]) =>
   queryOptions({
-    queryKey: ["stores", "walmart", "basket", list ?? null],
+    queryKey: ["stores", "walmart", "basket", items?.join(",") ?? null],
     queryFn: () =>
       unwrap(
         api.GET("/api/stores/walmart/basket", {
-          params: { query: list ? { list } : {} },
+          params: { query: itemsQuery(items) },
         })
       ),
   })
 
-/** A list's name, when the household has more than one to tell apart. */
-export function useListName(list: string | undefined) {
-  const { data } = useQuery(listQuery)
-  if (!list || !data || data.lists.length < 2) return null
-  return data.lists.find((one) => one.id === list)?.name ?? null
-}
+/**
+ * The stores the household shops at, for Find: its Kroger store and
+ * Walmart, which Merran can find products at, then the ones it picked.
+ */
+export const yourStoresQuery = queryOptions({
+  queryKey: ["stores", "yours"],
+  queryFn: async () => (await unwrap(api.GET("/api/stores/yours"))).stores,
+  staleTime: 5 * 60_000,
+})
+
+/** Send's plan for a list: which stores each thing on it is picked at. */
+export const sendPlanQuery = (list: string) =>
+  queryOptions({
+    queryKey: ["stores", "send-plan", list],
+    queryFn: () =>
+      unwrap(api.GET("/api/stores/send-plan", { params: { query: { list } } })),
+  })
 
 /** What's on sale at the household's store, and the recipes it's in. */
 export const dealsQuery = queryOptions({
@@ -118,14 +133,15 @@ export const listPricesQuery = queryOptions({
   queryFn: () => unwrap(api.GET("/api/stores/list-prices")),
 })
 
-/** The list's prices when the household has a Kroger store. */
+/** The list's prices, each at its store, when the household has one. */
 export function useListPrices() {
-  const on = useCapability("stores.kroger")
+  const kroger = useCapability("stores.kroger")
+  const walmart = useCapability("stores.walmart")
+  const on = kroger || walmart
   const { data } = useQuery({ ...listPricesQuery, enabled: on })
   return {
     items: new Map(Object.entries(data?.items ?? {})),
     currency: data?.currency ?? "USD",
-    store: data?.store ?? null,
   }
 }
 

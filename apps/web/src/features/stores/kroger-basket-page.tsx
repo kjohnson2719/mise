@@ -27,7 +27,6 @@ import { ProductSearchDialog } from "./product-search-dialog"
 import {
   formatPrice,
   krogerBasketQuery,
-  useListName,
   type Basket,
   type BasketLine,
 } from "./queries"
@@ -37,9 +36,17 @@ import {
  * how many, to look over before it goes to the linked account's cart.
  * Kroger only lets Merran add to the cart; checking out is on its site.
  */
-export function KrogerBasketPage({ list }: { list?: string }) {
+export function KrogerBasketPage({
+  items,
+  list,
+}: {
+  /** The things Send has going to Kroger; without them, everything left. */
+  items?: string[]
+  /** The list Send was for, to go back to. */
+  list?: string
+}) {
   const { t } = useTranslation()
-  const basket = useQuery(krogerBasketQuery(list))
+  const basket = useQuery(krogerBasketQuery(items))
 
   return (
     <>
@@ -47,17 +54,23 @@ export function KrogerBasketPage({ list }: { list?: string }) {
         variant="ghost"
         size="sm"
         className="mt-2 -ml-3 self-start md:mt-4"
-        render={<Link to="/list" />}
+        render={
+          list ? (
+            <Link to="/list/send" search={{ list }} />
+          ) : (
+            <Link to="/list" />
+          )
+        }
       >
         <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} />
-        {t("nav.list")}
+        {list ? t("list.send") : t("nav.list")}
       </Button>
       {basket.data ? (
         // Afresh after each send: what went is left out next time.
         <Review
           key={basket.data.sentAt ?? ""}
           basket={basket.data}
-          list={list}
+          items={items}
         />
       ) : basket.isPending ? (
         <>
@@ -90,9 +103,8 @@ export function KrogerBasketPage({ list }: { list?: string }) {
   )
 }
 
-function Review({ basket, list }: { basket: Basket; list?: string }) {
+function Review({ basket, items }: { basket: Basket; items?: string[] }) {
   const { t, i18n } = useTranslation()
-  const listName = useListName(list)
   const queryClient = useQueryClient()
   const { today } = useHouseholdClock()
   const admin = isAdminRole(useActiveHousehold()?.role)
@@ -137,7 +149,7 @@ function Review({ basket, list }: { basket: Basket; list?: string }) {
   }
 
   function picked(line: BasketLine) {
-    queryClient.setQueryData(krogerBasketQuery(list).queryKey, (was) =>
+    queryClient.setQueryData(krogerBasketQuery(items).queryKey, (was) =>
       was
         ? {
             ...was,
@@ -175,7 +187,7 @@ function Review({ basket, list }: { basket: Basket; list?: string }) {
         }
       )
       await queryClient.invalidateQueries({
-        queryKey: krogerBasketQuery(list).queryKey,
+        queryKey: krogerBasketQuery(items).queryKey,
       })
     } catch (err) {
       if (!(err instanceof ApiError)) throw err
@@ -189,18 +201,10 @@ function Review({ basket, list }: { basket: Basket; list?: string }) {
     <>
       <PageHeader
         title={t("stores.basket.title", { store: basket.store })}
-        description={
-          listName
-            ? t("stores.basket.descriptionFor", {
-                list: listName,
-                location: basket.location.name,
-                where,
-              })
-            : t("stores.basket.description", {
-                location: basket.location.name,
-                where,
-              })
-        }
+        description={t("stores.basket.description", {
+          location: basket.location.name,
+          where,
+        })}
         actions={
           <Button
             disabled={!basket.linked || going.length === 0 || sending}

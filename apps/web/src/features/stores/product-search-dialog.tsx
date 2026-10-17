@@ -24,6 +24,9 @@ import { api, ApiError, unwrap } from "@/lib/api/client"
 import { ProductSummary } from "./product-summary"
 import type { BasketLine, StoreProduct } from "./queries"
 
+/** The thing a product's picked for: one on the list, by id. */
+export type PickFor = Pick<BasketLine, "itemId" | "name">
+
 /** Kroger's search and pick, through Merran's server. */
 const KROGER = {
   search: async (q: string) =>
@@ -32,7 +35,7 @@ const KROGER = {
         api.GET("/api/stores/kroger/search", { params: { query: { q } } })
       )
     ).products,
-  pick: (line: BasketLine, product: StoreProduct) =>
+  pick: (line: PickFor, product: StoreProduct) =>
     unwrap(
       api.PUT("/api/stores/kroger/products/{itemId}", {
         params: { path: { itemId: line.itemId } },
@@ -59,15 +62,15 @@ export function ProductSearchDialog({
   start,
   hint,
 }: {
-  line: BasketLine | null
+  line: PickFor | null
   store: string
   today: string
   onOpenChange: (open: boolean) => void
   onPicked: (line: BasketLine) => void
   search?: (q: string) => Promise<StoreProduct[] | null>
-  pick?: (line: BasketLine, product: StoreProduct) => Promise<BasketLine>
+  pick?: (line: PickFor, product: StoreProduct) => Promise<BasketLine>
   /** What to offer as it opens, in place of searching for the thing. */
-  start?: (line: BasketLine) => Promise<StoreProduct[]>
+  start?: (line: PickFor) => Promise<StoreProduct[]>
   /** Where it searches, when it's not Merran's server. */
   hint?: string
 }) {
@@ -86,8 +89,8 @@ export function ProductSearchDialog({
   }, [line?.itemId])
 
   async function begin(
-    line: BasketLine,
-    start: (line: BasketLine) => Promise<StoreProduct[]>
+    line: PickFor,
+    start: (line: PickFor) => Promise<StoreProduct[]>
   ) {
     setBusy("search")
     let products: StoreProduct[] = []

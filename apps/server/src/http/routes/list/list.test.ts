@@ -129,7 +129,7 @@ describe("the list", () => {
     const res = await (await kyle.get("/api/list")).json()
     expect(res.items).toEqual([])
     expect(res.lists).toMatchObject([
-      { name: "Shopping list", main: true, store: null, aisles: [] },
+      { name: "Shopping list", main: true, aisles: [] },
     ])
     expect(
       res.aisles.slice(0, 3).map((aisle: { name: string }) => aisle.name)

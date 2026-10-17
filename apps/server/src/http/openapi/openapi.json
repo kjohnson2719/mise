@@ -3843,14 +3843,12 @@
             {
               "id": "0199e8b0-5a10-7a01-8b00-00000000001c",
               "name": "Shopping list",
-              "store": null,
               "main": true,
               "aisles": []
             },
             {
               "id": "0199e8b0-5a10-7a01-8b00-000000000025",
               "name": "Costco",
-              "store": "costco",
               "main": false,
               "aisles": [
                 "0199e8b0-5a10-7a01-8b00-000000000021"
@@ -3925,13 +3923,6 @@
           "name": {
             "type": "string"
           },
-          "store": {
-            "type": [
-              "string",
-              "null"
-            ],
-            "description": "The store it's for, like \"costco\"; null for any."
-          },
           "main": {
             "type": "boolean",
             "description": "The main list, which takes what no other list does."
@@ -3947,7 +3938,6 @@
         "required": [
           "id",
           "name",
-          "store",
           "main",
           "aisles"
         ]
@@ -4848,14 +4838,12 @@
             {
               "id": "0199e8b0-5a10-7a01-8b00-00000000001c",
               "name": "Shopping list",
-              "store": null,
               "main": true,
               "aisles": []
             },
             {
               "id": "0199e8b0-5a10-7a01-8b00-000000000025",
               "name": "Costco",
-              "store": "costco",
               "main": false,
               "aisles": [
                 "0199e8b0-5a10-7a01-8b00-000000000021"
@@ -4884,13 +4872,6 @@
                   "minLength": 1,
                   "maxLength": 40
                 },
-                "store": {
-                  "type": [
-                    "string",
-                    "null"
-                  ],
-                  "maxLength": 40
-                },
                 "aisles": {
                   "type": "array",
                   "items": {
@@ -4901,7 +4882,6 @@
               },
               "required": [
                 "name",
-                "store",
                 "aisles"
               ]
             },
@@ -4917,12 +4897,10 @@
             {
               "id": "0199e8b0-5a10-7a01-8b00-00000000001c",
               "name": "Groceries",
-              "store": null,
               "aisles": []
             },
             {
               "name": "Costco",
-              "store": "costco",
               "aisles": [
                 "0199e8b0-5a10-7a01-8b00-000000000021"
               ]
@@ -12538,7 +12516,7 @@
               "string",
               "null"
             ],
-            "description": "The household's store's banner, or null without one."
+            "description": "The household's Kroger store's banner, or null without one."
           },
           "currency": {
             "type": "string"
@@ -12548,6 +12526,10 @@
             "additionalProperties": {
               "type": "object",
               "properties": {
+                "store": {
+                  "type": "string",
+                  "description": "The store it's priced at: where the household picked a product for it, newest first, else its Kroger store."
+                },
                 "total": {
                   "type": "integer",
                   "description": "In cents, for the packages needed, at the sale price when there's a sale."
@@ -12609,6 +12591,7 @@
                 }
               },
               "required": [
+                "store",
                 "total",
                 "packages",
                 "sure",
@@ -12618,7 +12601,7 @@
                 "seenOn"
               ]
             },
-            "description": "By list item id, what's left to get on the list for the store. Things with no product kept for them, or no price, are left out."
+            "description": "By list item id, what's left to get on every list, each at its store. Things with no product kept for them at a store, or no price, are left out."
           }
         },
         "required": [
@@ -12631,6 +12614,7 @@
           "currency": "USD",
           "items": {
             "0199e8b0-5a10-7a01-8b00-00000000001d": {
+              "store": "Fry's",
               "total": 598,
               "packages": 2,
               "sure": true,
@@ -12644,6 +12628,160 @@
               "seenOn": "2026-10-17"
             }
           }
+        }
+      },
+      "YourStores": {
+        "type": "object",
+        "properties": {
+          "stores": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "description": "The store's key: \"kroger\"."
+                },
+                "name": {
+                  "type": "string",
+                  "description": "As the household knows it: Fry's."
+                },
+                "connected": {
+                  "type": "boolean",
+                  "description": "Merran can find its products and send to its cart: the household's Kroger store, and Walmart when the server has it on."
+                },
+                "searchable": {
+                  "type": "boolean",
+                  "description": "Its site can be searched, in the household's country."
+                }
+              },
+              "required": [
+                "key",
+                "name",
+                "connected",
+                "searchable"
+              ]
+            }
+          }
+        },
+        "required": [
+          "stores"
+        ],
+        "example": {
+          "stores": [
+            {
+              "key": "kroger",
+              "name": "Fry's",
+              "connected": true,
+              "searchable": true
+            },
+            {
+              "key": "costco",
+              "name": "Costco",
+              "connected": false,
+              "searchable": true
+            }
+          ]
+        }
+      },
+      "SendPlan": {
+        "type": "object",
+        "properties": {
+          "stores": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "name"
+              ]
+            },
+            "description": "The stores Merran can send to."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "amount": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "picked": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The stores the household picked a product at for its food (someone picked it, or it was sent there before; Merran's own picks don't count), newest first."
+                },
+                "sent": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  },
+                  "description": "The stores it's been sent to while it's on the list."
+                }
+              },
+              "required": [
+                "itemId",
+                "name",
+                "amount",
+                "picked",
+                "sent"
+              ]
+            }
+          }
+        },
+        "required": [
+          "stores",
+          "items"
+        ],
+        "example": {
+          "stores": [
+            {
+              "key": "kroger",
+              "name": "Fry's"
+            },
+            {
+              "key": "walmart",
+              "name": "Walmart"
+            }
+          ],
+          "items": [
+            {
+              "itemId": "0199e8b0-5a10-7a01-8b00-00000000001d",
+              "name": "milk",
+              "amount": "1 gallon",
+              "picked": [
+                "walmart",
+                "kroger"
+              ],
+              "sent": []
+            },
+            {
+              "itemId": "0199e8b0-5a10-7a01-8b00-00000000001e",
+              "name": "eggs",
+              "amount": "12",
+              "picked": [],
+              "sent": []
+            }
+          ]
         }
       },
       "KrogerStoreChanges": {
@@ -27275,6 +27413,132 @@
         }
       }
     },
+    "/api/stores/yours": {
+      "get": {
+        "operationId": "yourStores",
+        "tags": [
+          "Stores"
+        ],
+        "summary": "The stores the household shops at",
+        "description": "For Find on the list: its Kroger store when it has one and Walmart when the server has it on, which Merran can find products at and send to, then the stores it picked in Settings (`stores.yours`), whose sites can be searched. With an API key, it needs the `list: read` permission.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-merran-permission": "list:read",
+        "responses": {
+          "200": {
+            "description": "The household's stores.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YourStores"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stores/send-plan": {
+      "get": {
+        "operationId": "sendPlan",
+        "tags": [
+          "Stores"
+        ],
+        "summary": "Where each thing on a list can go",
+        "description": "For Send: the stores Merran can send to, and each thing left on the list with the stores the household picked a product at for it, newest first, which is where it goes (asking when there's more than one), and where it's been sent already. Each store's part is then reviewed and sent with its basket's `items`. With an API key, it needs the `list: read` permission.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-merran-permission": "list:read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "description": "The list being sent: the one the person's looking at.",
+              "example": "0199e8b0-5a10-7a01-8b00-00000000001c"
+            },
+            "required": true,
+            "description": "The list being sent: the one the person's looking at.",
+            "name": "list",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Where each thing can go.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SendPlan"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "There's no such list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/stores/kroger": {
       "put": {
         "operationId": "setKrogerStore",
@@ -27596,7 +27860,7 @@
           "Stores"
         ],
         "summary": "The Kroger cart to look over",
-        "description": "Each thing left on a list (the one asked for, the one the person's looking at; or without one the list for Kroger, else the lists for any store) with its product: the one the household picked before, at today's price, or Merran's pick from the store's search, made by the household's model for shopping when it has AI. How many packages, worked out from the product's size where it can be. Nothing is sent until `POST /stores/kroger/send`. With an API key, it needs the `list: write` permission.",
+        "description": "Each thing left to get (the ones asked for, which Send has going to Kroger; or without them, everything left on every list) with its product: the one the household picked before, at today's price, or Merran's pick from the store's search, made by the household's model for shopping when it has AI. How many packages, worked out from the product's size where it can be. Nothing is sent until `POST /stores/kroger/send`. With an API key, it needs the `list: write` permission.",
         "security": [
           {
             "session": []
@@ -27610,12 +27874,13 @@
           {
             "schema": {
               "type": "string",
-              "format": "uuid",
-              "description": "Just this list, the one the person's looking at. Without it, the store's own list, else the lists for no store in particular."
+              "pattern": "^[0-9a-f-]{36}(,[0-9a-f-]{36}){0,299}$/i",
+              "description": "Just these things on the list, by id, separated by commas: the ones Send has going to this store. Without it, everything left on every list.",
+              "example": "0199e8b0-5a10-7a01-8b00-00000000001d,0199e8b0-5a10-7a01-8b00-00000000001e"
             },
             "required": false,
-            "description": "Just this list, the one the person's looking at. Without it, the store's own list, else the lists for no store in particular.",
-            "name": "list",
+            "description": "Just these things on the list, by id, separated by commas: the ones Send has going to this store. Without it, everything left on every list.",
+            "name": "items",
             "in": "query"
           }
         ],
@@ -27642,16 +27907,6 @@
           },
           "403": {
             "description": "Not allowed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "There's no such list.",
             "content": {
               "application/json": {
                 "schema": {
@@ -27994,7 +28249,7 @@
           "Stores"
         ],
         "summary": "The Walmart cart to look over",
-        "description": "Experimental, when the server admin has turned Walmart on. Each thing left on a list (the one asked for, the one the person's looking at; or without one the list for Walmart, else the lists for any store) with its product, the household's own pick or Merran's, how many and what it cost when last seen; and what's still to find at Walmart, which Merran's browser extension looks for in the person's own Walmart tab. Merran never reaches Walmart itself. With an API key, it needs the `list: read` permission.",
+        "description": "Experimental, when the server admin has turned Walmart on. Each thing left to get (the ones asked for, which Send has going to Walmart; or without them, everything left on every list) with its product, the household's own pick or Merran's, how many and what it cost when last seen; and what's still to find at Walmart, which Merran's browser extension looks for in the person's own Walmart tab. Merran never reaches Walmart itself. With an API key, it needs the `list: read` permission.",
         "security": [
           {
             "session": []
@@ -28008,12 +28263,13 @@
           {
             "schema": {
               "type": "string",
-              "format": "uuid",
-              "description": "Just this list, the one the person's looking at. Without it, the store's own list, else the lists for no store in particular."
+              "pattern": "^[0-9a-f-]{36}(,[0-9a-f-]{36}){0,299}$/i",
+              "description": "Just these things on the list, by id, separated by commas: the ones Send has going to this store. Without it, everything left on every list.",
+              "example": "0199e8b0-5a10-7a01-8b00-00000000001d,0199e8b0-5a10-7a01-8b00-00000000001e"
             },
             "required": false,
-            "description": "Just this list, the one the person's looking at. Without it, the store's own list, else the lists for no store in particular.",
-            "name": "list",
+            "description": "Just these things on the list, by id, separated by commas: the ones Send has going to this store. Without it, everything left on every list.",
+            "name": "items",
             "in": "query"
           }
         ],
@@ -28040,16 +28296,6 @@
           },
           "403": {
             "description": "Not allowed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "There's no such list.",
             "content": {
               "application/json": {
                 "schema": {

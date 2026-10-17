@@ -6,7 +6,7 @@ Add recipes to Merran from the page you're on, even on sites that turn Merran's 
 
 - **The toolbar button:** connects to your Merran, then adds the recipe on the page you're on. A page with recipe data goes straight in; one without is read by your household's AI, if it has AI.
 - **Right-click:** a page or a link to add its recipe, or selected text to add it to the shopping list ("2 lemons, a bag of rice").
-- **The shopping list beside the page:** Chrome and Edge's side panel, Firefox's sidebar. Check things off as they go in the cart, and add what's missing.
+- **The shopping list beside the page:** Chrome and Edge's side panel, Firefox's sidebar. Find each thing at one of your stores (pick which at the top), check things off as they go in the cart, and add what's missing.
 - **Filling a Walmart cart** (experimental, when the server admin has turned Walmart on): Merran's Walmart page asks the extension to find each thing and add it to the cart in a Walmart tab of your own, one page at a time. It stops whenever Walmart asks whether you're a person, for you to finish in the tab, and checking out is always yours. It asks once to work on walmart.com, from a page of its own.
 
 ## Connecting

@@ -208,36 +208,6 @@ export function storesFor(country: string | null | undefined) {
     .sort((a, b) => a.name.localeCompare(b.name))
 }
 
-/** A name as stores are matched by it: "Trader Joe's" is "trader joes". */
-const plain = (name: string) =>
-  ` ${name
-    .toLowerCase()
-    .replace(/['’]/g, "")
-    .replace(/[^\p{L}\p{N}]+/gu, " ")
-    .trim()} `
-
-/**
- * The store a list is named for, when it isn't set to one: "Walmart" or
- * "Costco run" is that store's, among the stores for the household's
- * country and any others given (the household's Kroger store by its
- * banner: "Fry's" is Kroger's). The longest name wins, so "Whole Foods"
- * isn't anything shorter; null when no store's name is in it.
- */
-export function storeNamed(
-  listName: string,
-  country: string | null | undefined,
-  also: readonly { key: string; name: string }[] = []
-): string | null {
-  const name = plain(listName)
-  const named = [...storesFor(country), ...also]
-    .filter((store) => {
-      const words = plain(store.name)
-      return words.trim().length > 0 && name.includes(words)
-    })
-    .sort((a, b) => b.name.length - a.name.length)
-  return named[0]?.key ?? null
-}
-
 /**
  * Where to look for something on a store's site, in the household's
  * country: null for a store without a search (or one for that country).

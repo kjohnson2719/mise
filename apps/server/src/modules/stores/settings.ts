@@ -1,7 +1,8 @@
-import { SALE_LEANS } from "@merran/shared"
+import { SALE_LEANS, STORES_BY_KEY } from "@merran/shared"
 import { z } from "zod"
 import {
   choiceSetting,
+  listSetting,
   numberSetting,
   secretSetting,
   switchSetting,
@@ -26,6 +27,19 @@ export const STORE_SETTINGS = {
     description:
       "Experimental: Walmart through Merran's browser extension, in each person's own Walmart tab. It finds each thing on the list, Merran picks a product, and it fills their Walmart cart. It stops at Walmart's check that it's a person and asks them, and it may need fixing whenever Walmart changes its site.",
     default: false,
+  }),
+  yours: listSetting<string[]>({
+    key: "stores.yours",
+    level: "household",
+    item: z
+      .string()
+      .refine(
+        (key) => STORES_BY_KEY.has(key),
+        "Merran doesn't know that store."
+      ),
+    description:
+      'The stores the household shops at, by key ("costco", "target"), for Find on the list. Its Kroger store, and Walmart when the server has it on, count without being here.',
+    default: [],
   }),
   leanOnSales: choiceSetting({
     key: "stores.leanOnSales",

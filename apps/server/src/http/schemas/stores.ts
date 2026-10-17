@@ -211,15 +211,24 @@ export const ProductsSchema = z
   .openapi("StoreProducts", { example: { products: [PRODUCT] } })
 
 export const BasketQuery = z.object({
-  list: z
-    .uuid()
+  items: z
+    .string()
+    .regex(
+      /^[0-9a-f-]{36}(,[0-9a-f-]{36}){0,299}$/i,
+      "Things on the list by id, separated by commas: 300 at most."
+    )
     .optional()
     .openapi({
-      param: { name: "list", in: "query" },
+      param: { name: "items", in: "query" },
       description:
-        "Just this list, the one the person's looking at. Without it, the store's own list, else the lists for no store in particular.",
+        "Just these things on the list, by id, separated by commas: the ones Send has going to this store. Without it, everything left on every list.",
+      example: `${IDS.listItems[0]},${IDS.listItems[1]}`,
     }),
 })
+
+/** The ids in a basket's `items`, if it has any. */
+export const itemIdsOf = (items: string | undefined) =>
+  items ? items.split(",") : undefined
 
 export const SearchQuery = z.object({
   q: z
@@ -395,13 +404,18 @@ export const CostsSchema = z
 export const ListPricesSchema = z
   .object({
     store: z.string().nullable().openapi({
-      description: "The household's store's banner, or null without one.",
+      description:
+        "The household's Kroger store's banner, or null without one.",
     }),
     currency: z.string(),
     items: z
       .record(
         z.string(),
         z.object({
+          store: z.string().openapi({
+            description:
+              "The store it's priced at: where the household picked a product for it, newest first, else its Kroger store.",
+          }),
           total: z.number().int().openapi({
             description:
               "In cents, for the packages needed, at the sale price when there's a sale.",
@@ -436,7 +450,7 @@ export const ListPricesSchema = z
       )
       .openapi({
         description:
-          "By list item id, what's left to get on the list for the store. Things with no product kept for them, or no price, are left out.",
+          "By list item id, what's left to get on every list, each at its store. Things with no product kept for them at a store, or no price, are left out.",
       }),
   })
   .openapi("ListPrices", {
@@ -445,6 +459,7 @@ export const ListPricesSchema = z
       currency: "USD",
       items: {
         [IDS.listItems[0]!]: {
+          store: "Fry's",
           total: 598,
           packages: 2,
           sure: true,
@@ -454,5 +469,85 @@ export const ListPricesSchema = z
           seenOn: "2026-10-17",
         },
       },
+    },
+  })
+
+export const YourStoresSchema = z
+  .object({
+    stores: z.array(
+      z.object({
+        key: z.string().openapi({ description: 'The store\'s key: "kroger".' }),
+        name: z
+          .string()
+          .openapi({ description: "As the household knows it: Fry's." }),
+        connected: z.boolean().openapi({
+          description:
+            "Merran can find its products and send to its cart: the household's Kroger store, and Walmart when the server has it on.",
+        }),
+        searchable: z.boolean().openapi({
+          description: "Its site can be searched, in the household's country.",
+        }),
+      })
+    ),
+  })
+  .openapi("YourStores", {
+    example: {
+      stores: [
+        { key: "kroger", name: "Fry's", connected: true, searchable: true },
+        { key: "costco", name: "Costco", connected: false, searchable: true },
+      ],
+    },
+  })
+
+export const SendPlanQuery = z.object({
+  list: z.uuid().openapi({
+    param: { name: "list", in: "query" },
+    description: "The list being sent: the one the person's looking at.",
+    example: IDS.shoppingList,
+  }),
+})
+
+export const SendPlanSchema = z
+  .object({
+    stores: z
+      .array(z.object({ key: z.string(), name: z.string() }))
+      .openapi({ description: "The stores Merran can send to." }),
+    items: z.array(
+      z.object({
+        itemId: z.string(),
+        name: z.string(),
+        amount: z.string().nullable(),
+        picked: z.array(z.string()).openapi({
+          description:
+            "The stores the household picked a product at for its food (someone picked it, or it was sent there before; Merran's own picks don't count), newest first.",
+        }),
+        sent: z.array(z.string()).openapi({
+          description: "The stores it's been sent to while it's on the list.",
+        }),
+      })
+    ),
+  })
+  .openapi("SendPlan", {
+    example: {
+      stores: [
+        { key: "kroger", name: "Fry's" },
+        { key: "walmart", name: "Walmart" },
+      ],
+      items: [
+        {
+          itemId: IDS.listItems[0]!,
+          name: "milk",
+          amount: "1 gallon",
+          picked: ["walmart", "kroger"],
+          sent: [],
+        },
+        {
+          itemId: IDS.listItems[1]!,
+          name: "eggs",
+          amount: "12",
+          picked: [],
+          sent: [],
+        },
+      ],
     },
   })

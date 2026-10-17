@@ -4,12 +4,7 @@ import {
   ShoppingCart01Icon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import {
-  priceNow,
-  type ExtensionCalls,
-  type ExtensionNo,
-  type ExtensionStatus,
-} from "@merran/shared"
+import { priceNow, type ExtensionCalls } from "@merran/shared"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import * as React from "react"
@@ -22,40 +17,39 @@ import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Spinner } from "@/components/ui/spinner"
 import { useActiveHousehold } from "@/features/auth/use-me"
-import {
-  callExtension,
-  ExtensionError,
-  useExtension,
-} from "@/features/extension/bridge"
+import { callExtension } from "@/features/extension/bridge"
 import { ExtensionSetup } from "@/features/extension/extension-setup"
 import { useHouseholdClock } from "@/features/plan/queries"
-import { api, ApiError, unwrap, type Schemas } from "@/lib/api/client"
+import { ApiError, type Schemas } from "@/lib/api/client"
 import { formatRelativeDate } from "@/lib/format"
 
 import { BasketLineRow } from "./basket-line"
 import { ProductSearchDialog } from "./product-search-dialog"
-import {
-  formatPrice,
-  useListName,
-  walmartBasketQuery,
-  type BasketLine,
-  type StoreProduct,
-} from "./queries"
+import { formatPrice, walmartBasketQuery, type BasketLine } from "./queries"
 import { WalmartJobCard } from "./walmart-job"
+import { useSaidNo, useWalmartPicker } from "./walmart-picker"
 
 type WalmartBasket = Schemas["WalmartBasket"]
 
 /**
- * The list at Walmart (experimental): a product for each thing and how
- * many, to look over before Merran's browser extension fills the cart in
- * a Walmart tab of the person's own. Merran never reaches Walmart itself,
- * and never gets past Walmart's check that it's a person: the extension
- * stops, and this page asks the person to finish it in the tab and carry
- * on. Checking out is always theirs, on Walmart's site.
+ * Things at Walmart (experimental): the ones Send has going there, a
+ * product for each and how many, to look over before Merran's browser
+ * extension fills the cart in a Walmart tab of the person's own. Merran
+ * never reaches Walmart itself, and never gets past Walmart's check that
+ * it's a person: the extension stops, and this page asks the person to
+ * finish it in the tab. Checking out is always theirs, on Walmart's site.
  */
-export function WalmartBasketPage({ list }: { list?: string }) {
+export function WalmartBasketPage({
+  items,
+  list,
+}: {
+  /** The things Send has going to Walmart; without them, everything left. */
+  items?: string[]
+  /** The list Send was for, to go back to. */
+  list?: string
+}) {
   const { t } = useTranslation()
-  const basket = useQuery(walmartBasketQuery(list))
+  const basket = useQuery(walmartBasketQuery(items))
 
   return (
     <>
@@ -63,13 +57,19 @@ export function WalmartBasketPage({ list }: { list?: string }) {
         variant="ghost"
         size="sm"
         className="mt-2 -ml-3 self-start md:mt-4"
-        render={<Link to="/list" />}
+        render={
+          list ? (
+            <Link to="/list/send" search={{ list }} />
+          ) : (
+            <Link to="/list" />
+          )
+        }
       >
         <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} />
-        {t("nav.list")}
+        {list ? t("list.send") : t("nav.list")}
       </Button>
       {basket.data ? (
-        <Walmart basket={basket.data} list={list} />
+        <Walmart basket={basket.data} items={items} />
       ) : basket.isPending ? (
         <>
           <PageHeader title={t("stores.walmart.title")} />
@@ -98,35 +98,21 @@ export function WalmartBasketPage({ list }: { list?: string }) {
   )
 }
 
-/** What the extension said no for, as the person reads it. */
-function useSaidNo() {
-  const { t } = useTranslation()
-  return (answer: { ok: false; why: ExtensionNo; message?: string } | null) =>
-    answer === null
-      ? t("stores.walmart.no.noAnswer")
-      : (answer.message ?? t(`stores.walmart.no.${answer.why}`))
-}
-
 function Walmart({
   basket,
-  list,
+  items,
 }: {
   basket: WalmartBasket
-  /** The list the person's looking at, which is all that's sent. */
-  list?: string
+  /** The things Send has going to Walmart, which are all that's sent. */
+  items?: string[]
 }) {
   const { t, i18n } = useTranslation()
-  const listName = useListName(list)
   const queryClient = useQueryClient()
   const { today } = useHouseholdClock()
   const household = useActiveHousehold()
-  const extension = useExtension()
+  const walmart = useWalmartPicker()
+  const { extension, status, ready } = walmart
   const saidNo = useSaidNo()
-  const status: ExtensionStatus | null =
-    extension.state === "here" ? extension.status : null
-  const connected =
-    status?.households.some((one) => one.id === household?.id) ?? false
-  const ready = connected && status?.walmart.access === true
   const job = status?.job ?? null
   const working = job?.state === "running"
   // Stopped part way, or at Walmart's check: carried on or put aside first.
@@ -138,7 +124,7 @@ function Walmart({
   React.useEffect(() => {
     if (moved) {
       void queryClient.invalidateQueries({
-        queryKey: walmartBasketQuery(list).queryKey,
+        queryKey: walmartBasketQuery(items).queryKey,
       })
     }
   }, [moved, queryClient])
@@ -189,7 +175,7 @@ function Walmart({
     household &&
     void ask("walmart-find", {
       householdId: household.id,
-      ...(list ? { list } : {}),
+      ...(items ? { items } : {}),
     })
 
   const fill = () =>
@@ -200,52 +186,10 @@ function Walmart({
         itemId: line.itemId,
         packages: packagesOf(line),
       })),
-      ...(list ? { list } : {}),
     })
 
-  /** Walmart's search, in the person's Walmart tab, for picking by hand. */
-  async function search(words: string): Promise<StoreProduct[] | null> {
-    if (!household) return null
-    // No extension to search with: say so now, not after waiting for it.
-    if (!ready) throw new ExtensionError(t("stores.walmart.no.searchSetup"))
-    const answer = await callExtension(
-      "walmart-search",
-      { householdId: household.id, words },
-      60_000
-    )
-    if (answer?.ok) return answer.products
-    if (answer?.why === "check") {
-      toast.warning(t("stores.walmart.no.searchCheck"), {
-        action: {
-          label: t("stores.walmart.job.showTab"),
-          onClick: () => void callExtension("walmart-show", {}),
-        },
-      })
-      return null
-    }
-    throw new ExtensionError(saidNo(answer))
-  }
-
-  /** What Walmart had for it when the extension looked: no Walmart visit. */
-  const options = async (line: BasketLine) =>
-    (
-      await unwrap(
-        api.GET("/api/stores/walmart/products/{itemId}", {
-          params: { path: { itemId: line.itemId } },
-        })
-      )
-    ).products
-
-  const pick = (line: BasketLine, product: StoreProduct) =>
-    unwrap(
-      api.PUT("/api/stores/walmart/products/{itemId}", {
-        params: { path: { itemId: line.itemId } },
-        body: { product: product as Schemas["WalmartProduct"] },
-      })
-    )
-
   function picked(line: BasketLine) {
-    queryClient.setQueryData(walmartBasketQuery(list).queryKey, (was) =>
+    queryClient.setQueryData(walmartBasketQuery(items).queryKey, (was) =>
       was
         ? {
             ...was,
@@ -263,11 +207,7 @@ function Walmart({
     <>
       <PageHeader
         title={t("stores.walmart.title")}
-        description={
-          listName
-            ? t("stores.walmart.descriptionFor", { list: listName })
-            : t("stores.walmart.description")
-        }
+        description={t("stores.walmart.description")}
         actions={
           <Button
             disabled={
@@ -412,9 +352,9 @@ function Walmart({
         today={today}
         onOpenChange={(open) => !open && setPicking(null)}
         onPicked={picked}
-        search={search}
-        start={options}
-        pick={pick}
+        search={walmart.search}
+        start={walmart.start}
+        pick={walmart.pick}
         hint={t("stores.walmart.searchHint")}
       />
     </>

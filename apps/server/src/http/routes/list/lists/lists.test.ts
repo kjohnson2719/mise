@@ -11,8 +11,8 @@ import {
   TestClient,
 } from "../../../../test/app.ts"
 
-// Lists by store: a household in the US with a Costco list for meat, and
-// the main list for everything else.
+// Lists: a household in the US with a Costco list for meat, and the main
+// list for everything else. Stores are chosen for each thing, not a list.
 
 let app: App
 let close: () => Promise<void>
@@ -24,7 +24,6 @@ let aisles: Record<string, string> = {}
 type List = {
   id: string
   name: string
-  store: string | null
   main: boolean
   aisles: string[]
 }
@@ -49,21 +48,20 @@ async function save(lists: unknown[]) {
 /** Splits off a Costco list for meat and seafood. */
 async function splitOffCostco() {
   const res = await save([
-    { id: main, name: "Groceries", store: null, aisles: [] },
+    { id: main, name: "Groceries", aisles: [] },
     {
       name: "Costco",
-      store: "costco",
       aisles: [aisles["Meat & seafood"]],
     },
   ])
   expect(res.status, await res.clone().text()).toBe(200)
   const { lists } = (await res.json()) as { lists: List[] }
-  return lists.find((list) => list.store === "costco")!.id
+  return lists.find((list) => list.name === "Costco")!.id
 }
 
 async function reset() {
   await kyle.post("/api/list/clear", { which: "all" })
-  await save([{ id: main, name: "Shopping list", store: null, aisles: [] }])
+  await save([{ id: main, name: "Shopping list", aisles: [] }])
 }
 
 beforeAll(async () => {
@@ -88,10 +86,10 @@ beforeAll(async () => {
 
 afterAll(() => close())
 
-describe("lists by store", () => {
+describe("lists", () => {
   test("start as one main list", async () => {
     expect((await getList()).lists).toEqual([
-      { id: main, name: "Shopping list", store: null, main: true, aisles: [] },
+      { id: main, name: "Shopping list", main: true, aisles: [] },
     ])
   })
 
@@ -106,7 +104,6 @@ describe("lists by store", () => {
       {
         id: costco,
         name: "Costco",
-        store: "costco",
         main: false,
         aisles: [aisles["Meat & seafood"]],
       },
@@ -189,9 +186,7 @@ describe("lists by store", () => {
   test("going take what's on them to the main list", async () => {
     await splitOffCostco()
     const beef = await type("2 lb ground beef")
-    const res = await save([
-      { id: main, name: "Groceries", store: null, aisles: [] },
-    ])
+    const res = await save([{ id: main, name: "Groceries", aisles: [] }])
     expect((await res.json()).lists).toHaveLength(1)
     expect(
       (await getList()).items.find((item) => item.id === beef.id)?.list
@@ -203,40 +198,26 @@ describe("lists by store", () => {
     const costco = await splitOffCostco()
     const check = async (lists: unknown[], status: number) =>
       expect((await save(lists)).status).toBe(status)
-    const groceries = { id: main, name: "Groceries", store: null, aisles: [] }
+    const groceries = { id: main, name: "Groceries", aisles: [] }
     // The main list stays.
-    await check(
-      [{ id: costco, name: "Costco", store: "costco", aisles: [] }],
-      400
-    )
-    // One list a store.
-    await check(
-      [
-        groceries,
-        { name: "Costco", store: "costco", aisles: [] },
-        { name: "Costco again", store: "costco", aisles: [] },
-      ],
-      400
-    )
+    await check([{ id: costco, name: "Costco", aisles: [] }], 400)
     // An aisle on one list.
     const meat = aisles["Meat & seafood"]
     await check(
       [
         groceries,
-        { name: "Costco", store: "costco", aisles: [meat] },
-        { name: "Butcher", store: null, aisles: [meat] },
+        { name: "Costco", aisles: [meat] },
+        { name: "Butcher", aisles: [meat] },
       ],
       400
     )
-    // Stores Merran knows; lists and aisles the household has.
-    await check([groceries, { name: "X", store: "nope", aisles: [] }], 400)
+    // Lists and aisles the household has.
     await check(
       [
         groceries,
         {
           id: "0199e8b0-5a10-7a01-8b00-000000000099",
           name: "X",
-          store: null,
           aisles: [],
         },
       ],
@@ -247,7 +228,6 @@ describe("lists by store", () => {
         groceries,
         {
           name: "X",
-          store: null,
           aisles: ["0199e8b0-5a10-7a01-8b00-000000000099"],
         },
       ],
@@ -258,7 +238,6 @@ describe("lists by store", () => {
         groceries,
         ...Array.from({ length: 10 }, (_, i) => ({
           name: `List ${i}`,
-          store: null,
           aisles: [],
         })),
       ],
@@ -271,7 +250,7 @@ describe("lists by store", () => {
     expect(
       (
         await jamie.put("/api/list/lists", {
-          lists: [{ id: main, name: "Mine", store: null, aisles: [] }],
+          lists: [{ id: main, name: "Mine", aisles: [] }],
         })
       ).status
     ).toBe(403)
@@ -291,7 +270,7 @@ describe("lists by store", () => {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        lists: [{ id: main, name: "Mine", store: null, aisles: [] }],
+        lists: [{ id: main, name: "Mine", aisles: [] }],
       }),
     })
     expect(res.status).toBe(403)

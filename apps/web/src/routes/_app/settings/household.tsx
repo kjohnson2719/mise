@@ -23,6 +23,7 @@ import { PhotosCard } from "@/features/household/photos-card"
 import { NewHouseholdCard } from "@/features/household/new-household-card"
 import { PlanningCard } from "@/features/household/planning-card"
 import { StoresCard } from "@/features/stores/stores-card"
+import { YourStoresCard } from "@/features/stores/your-stores-card"
 import {
   householdQuery,
   invitesQuery,
@@ -85,6 +86,7 @@ function HouseholdSettings() {
           {isAdminRole(household.role) && <HouseholdAiCard />}
           {isAdminRole(household.role) && <NutritionLibraryCard />}
           {isAdminRole(household.role) && <PhotosCard />}
+          {isAdminRole(household.role) && <YourStoresCard />}
           {isAdminRole(household.role) && <StoresCard />}
           <MembersCard />
           {isAdminRole(household.role) && <InvitesCard />}

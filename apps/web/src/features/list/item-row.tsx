@@ -1,23 +1,43 @@
-import { Search01Icon, Tag01Icon } from "@hugeicons/core-free-icons"
+import {
+  LinkSquare02Icon,
+  Search01Icon,
+  Tag01Icon,
+} from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
 import { useTranslation } from "react-i18next"
 
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { SelectMark } from "@/features/select/select-mark"
 import { useLongPress, type Selection } from "@/features/select/use-selection"
-import { formatPrice, type ItemPrice } from "@/features/stores/queries"
+import {
+  formatPrice,
+  type ItemPrice,
+  type YourStore,
+} from "@/features/stores/queries"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
 
 import type { ListItem } from "./queries"
 import { useListActions } from "./use-list-actions"
 
-/** What the things on a list cost at the household's store. */
+/** What the things on a list cost, each at its store. */
 export type RowPrices = {
   of: (item: ListItem) => ItemPrice | null
   currency: string
-  /** The store's banner: Fry's. */
-  store: string | null
+}
+
+/** Finding a thing at one of the household's stores. */
+export type RowFind = {
+  stores: readonly YourStore[]
+  onFind: (item: ListItem, store: YourStore) => void
 }
 
 /** Dishes named on the line under a thing; the rest are "and 3 more". */
@@ -26,21 +46,21 @@ const MEALS_SHOWN = 2
 /**
  * One thing to buy, in at most two lines: a box to check it off, its name
  * and how much (tap to change it), and under that what it's for. On the
- * right, what it costs and what a sale saves, and on a store's list,
- * finding it on the store's site. A long press starts selecting with it.
+ * right, what it costs and what a sale saves, and Find, at any of the
+ * household's stores. A long press starts selecting with it.
  */
 export function ItemRow({
   item,
   selection,
   onEdit,
-  findAt = null,
+  find = null,
   prices = null,
 }: {
   item: ListItem
   selection: Selection
   onEdit: () => void
-  /** Its store's search for it, for a list that's for a store. */
-  findAt?: { store: string; url: string } | null
+  /** The household's stores to find it at. */
+  find?: RowFind | null
   /**
    * The list's prices, when anything left on it has one: a row without a
    * price keeps the column, so prices line up.
@@ -85,7 +105,8 @@ export function ItemRow({
     .filter(Boolean)
     .join(" · ")
 
-  const find = item.checked || selecting ? null : findAt
+  const finding =
+    item.checked || selecting || !find?.stores.length ? null : find
   const note = cost ? priceNote(cost) : undefined
 
   /** "Fry's price on Oct 17, for 2 × Kroger 2% Milk. Usually $3.49 each." */
@@ -93,7 +114,7 @@ export function ItemRow({
     const day = (iso: string) => formatDate(`${iso}T12:00:00`, i18n.language)
     return [
       t(cost.packages > 1 ? "list.price.notePacks" : "list.price.note", {
-        store: prices?.store ?? "",
+        store: cost.store,
         day: day(cost.seenOn),
         packages: cost.packages,
         product: cost.product,
@@ -210,26 +231,46 @@ export function ItemRow({
           )}
         </div>
       )}
-      {find && (
-        <a
-          href={find.url}
-          target="_blank"
-          rel="noreferrer noopener"
-          aria-label={t("list.findName", {
-            name: item.name,
-            store: find.store,
-          })}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-sm font-medium text-primary outline-none hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
-        >
-          <HugeiconsIcon
-            icon={Search01Icon}
-            strokeWidth={2}
-            className="size-4"
-          />
-          <span className="hidden @lg:inline">
-            {t("list.find", { store: find.store })}
-          </span>
-        </a>
+      {finding && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            aria-label={t("list.findName", { name: item.name })}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2 py-1 text-sm font-medium text-primary outline-none hover:bg-muted focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          >
+            <HugeiconsIcon
+              icon={Search01Icon}
+              strokeWidth={2}
+              className="size-4"
+            />
+            <span className="hidden @lg:inline">{t("list.findMenu")}</span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel>
+                {t("list.findAtLabel", { name: item.name })}
+              </DropdownMenuLabel>
+              {finding.stores.map((store) => (
+                <DropdownMenuItem
+                  key={store.key}
+                  onClick={() => finding.onFind(item, store)}
+                >
+                  <span className="flex-1">{store.name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {store.connected ? (
+                      t("list.findPick")
+                    ) : (
+                      <HugeiconsIcon
+                        icon={LinkSquare02Icon}
+                        strokeWidth={2}
+                        className="size-3.5"
+                      />
+                    )}
+                  </span>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
     </li>
   )

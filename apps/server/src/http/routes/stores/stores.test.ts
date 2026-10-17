@@ -946,6 +946,7 @@ describe("buying by the package, costs and a budget", () => {
     // Two gallons went to the cart, at $2.99 instead of $3.49: the lowest
     // in a while.
     expect(prices.items[id("milk")]).toEqual({
+      store: "Fry's",
       total: 598,
       packages: 2,
       sure: true,

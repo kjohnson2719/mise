@@ -20,6 +20,7 @@ import { Route as AppShareRouteImport } from './routes/_app/share'
 import { Route as JoinTokenRouteImport } from './routes/join/$token'
 import { Route as AppListIndexRouteImport } from './routes/_app/list/index'
 import { Route as AppListKrogerRouteImport } from './routes/_app/list/kroger'
+import { Route as AppListSendRouteImport } from './routes/_app/list/send'
 import { Route as AppListWalmartRouteImport } from './routes/_app/list/walmart'
 import { Route as AppPantryIndexRouteImport } from './routes/_app/pantry/index'
 import { Route as AppRecipesIndexRouteImport } from './routes/_app/recipes/index'
@@ -92,6 +93,11 @@ const AppListIndexRoute = AppListIndexRouteImport.update({
 const AppListKrogerRoute = AppListKrogerRouteImport.update({
   id: '/list/kroger',
   path: '/list/kroger',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppListSendRoute = AppListSendRouteImport.update({
+  id: '/list/send',
+  path: '/list/send',
   getParentRoute: () => AppRoute,
 } as any)
 const AppListWalmartRoute = AppListWalmartRouteImport.update({
@@ -207,6 +213,7 @@ export interface FileRoutesByFullPath {
   '/share': typeof AppShareRoute
   '/join/$token': typeof JoinTokenRoute
   '/list/kroger': typeof AppListKrogerRoute
+  '/list/send': typeof AppListSendRoute
   '/list/walmart': typeof AppListWalmartRoute
   '/recipes/deleted': typeof AppRecipesDeletedRoute
   '/recipes/new': typeof AppRecipesNewRoute
@@ -237,6 +244,7 @@ export interface FileRoutesByTo {
   '/share': typeof AppShareRoute
   '/join/$token': typeof JoinTokenRoute
   '/list/kroger': typeof AppListKrogerRoute
+  '/list/send': typeof AppListSendRoute
   '/list/walmart': typeof AppListWalmartRoute
   '/recipes/deleted': typeof AppRecipesDeletedRoute
   '/recipes/new': typeof AppRecipesNewRoute
@@ -271,6 +279,7 @@ export interface FileRoutesById {
   '/join/$token': typeof JoinTokenRoute
   '/_app/': typeof AppIndexRoute
   '/_app/list/kroger': typeof AppListKrogerRoute
+  '/_app/list/send': typeof AppListSendRoute
   '/_app/list/walmart': typeof AppListWalmartRoute
   '/_app/recipes/deleted': typeof AppRecipesDeletedRoute
   '/_app/recipes/new': typeof AppRecipesNewRoute
@@ -304,6 +313,7 @@ export interface FileRouteTypes {
     | '/share'
     | '/join/$token'
     | '/list/kroger'
+    | '/list/send'
     | '/list/walmart'
     | '/recipes/deleted'
     | '/recipes/new'
@@ -334,6 +344,7 @@ export interface FileRouteTypes {
     | '/share'
     | '/join/$token'
     | '/list/kroger'
+    | '/list/send'
     | '/list/walmart'
     | '/recipes/deleted'
     | '/recipes/new'
@@ -367,6 +378,7 @@ export interface FileRouteTypes {
     | '/join/$token'
     | '/_app/'
     | '/_app/list/kroger'
+    | '/_app/list/send'
     | '/_app/list/walmart'
     | '/_app/recipes/deleted'
     | '/_app/recipes/new'
@@ -475,6 +487,13 @@ declare module '@tanstack/react-router' {
       path: '/list/kroger'
       fullPath: '/list/kroger'
       preLoaderRoute: typeof AppListKrogerRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/list/send': {
+      id: '/_app/list/send'
+      path: '/list/send'
+      fullPath: '/list/send'
+      preLoaderRoute: typeof AppListSendRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/list/walmart': {
@@ -646,6 +665,7 @@ interface AppRouteChildren {
   AppShareRoute: typeof AppShareRoute
   AppIndexRoute: typeof AppIndexRoute
   AppListKrogerRoute: typeof AppListKrogerRoute
+  AppListSendRoute: typeof AppListSendRoute
   AppListWalmartRoute: typeof AppListWalmartRoute
   AppRecipesDeletedRoute: typeof AppRecipesDeletedRoute
   AppRecipesNewRoute: typeof AppRecipesNewRoute
@@ -668,6 +688,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppShareRoute: AppShareRoute,
   AppIndexRoute: AppIndexRoute,
   AppListKrogerRoute: AppListKrogerRoute,
+  AppListSendRoute: AppListSendRoute,
   AppListWalmartRoute: AppListWalmartRoute,
   AppRecipesDeletedRoute: AppRecipesDeletedRoute,
   AppRecipesNewRoute: AppRecipesNewRoute,

@@ -7,7 +7,7 @@ import {
 } from "react"
 import { createRoot } from "react-dom/client"
 
-import { STORES_BY_KEY, storeSearch } from "@merran/shared"
+import { storeSearch } from "@merran/shared"
 
 import { HouseholdSwitch } from "@/lib/households"
 import {
@@ -21,12 +21,14 @@ import {
 import "@/lib/ui.css"
 
 // The shopping list beside the page, while shopping a store's site: find
-// each thing there, check it off as it goes in the cart, and add what's
+// each thing at one of the household's stores (picked at the top, and
+// remembered), check it off as it goes in the cart, and add what's
 // missing. It looks again every so often, so changes from the household's
 // phones show.
 
 type ShoppingList = Schemas["ShoppingList"]
 type Item = Schemas["ListItem"]
+type YourStore = Schemas["YourStores"]["stores"][number]
 
 /** How often the list is read again while the panel is open. */
 const EVERY_MS = 15_000
@@ -69,7 +71,34 @@ function List({
   const [adding, setAdding] = useState("")
   const [busy, setBusy] = useState(false)
   const [country, setCountry] = useState<string | null>(null)
+  const [stores, setStores] = useState<YourStore[]>([])
+  const [findAt, setFindAt] = useState<string | null>(null)
   const api = apiFor(connection)
+  const remembered = `findAt:${connection.keyId}`
+
+  // The household's stores whose sites can be searched, and the one this
+  // panel finds things at, as it was last time.
+  useEffect(() => {
+    void unwrap(apiFor(connection).GET("/api/stores/yours"), connection.origin)
+      .then(async ({ stores: all }) => {
+        const searchable = all.filter((store) => store.searchable)
+        setStores(searchable)
+        const saved = (await browser.storage.local.get(remembered))[
+          remembered
+        ] as string | undefined
+        setFindAt(
+          searchable.find((store) => store.key === saved)?.key ??
+            searchable[0]?.key ??
+            null
+        )
+      })
+      .catch(() => {})
+  }, [connection, remembered])
+
+  function chooseStore(key: string) {
+    setFindAt(key)
+    void browser.storage.local.set({ [remembered]: key })
+  }
 
   // The household's country, for which of a store's sites to search.
   useEffect(() => {
@@ -155,11 +184,10 @@ function List({
 
   const lists = list?.lists ?? []
   const listId = shown ?? lists[0]?.id ?? null
-  const store = lists.find((one) => one.id === listId)?.store ?? null
-  const storeName = store ? (STORES_BY_KEY.get(store)?.name ?? store) : null
-  /** Its store's search for something, in the tab beside the panel. */
+  const storeName = stores.find((one) => one.key === findAt)?.name ?? null
+  /** The chosen store's search for something, in the tab beside the panel. */
   const finder = (item: Item) => {
-    const url = storeSearch(store, country, item.name)
+    const url = storeSearch(findAt, country, item.name)
     if (!url) return undefined
     return async () => {
       const [tab] = await browser.tabs.query({
@@ -207,6 +235,24 @@ function List({
             </option>
           ))}
         </select>
+      )}
+
+      {stores.length > 0 && (
+        <label className="row small muted">
+          Find at
+          <select
+            className="grow"
+            value={findAt ?? ""}
+            onChange={(event) => chooseStore(event.target.value)}
+            aria-label="Find things at"
+          >
+            {stores.map((store) => (
+              <option key={store.key} value={store.key}>
+                {store.name}
+              </option>
+            ))}
+          </select>
+        </label>
       )}
 
       <form className="row" onSubmit={add}>
@@ -272,7 +318,7 @@ function ItemRow({
 }: {
   item: Item
   onCheck: (item: Item, checked: boolean) => void
-  /** Searches its store's site for it, on a store's list. */
+  /** Searches the chosen store's site for it. */
   onFind?: () => Promise<void>
   store?: string | null
 }) {

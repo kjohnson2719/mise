@@ -3228,6 +3228,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stores/yours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The stores the household shops at
+         * @description For Find on the list: its Kroger store when it has one and Walmart when the server has it on, which Merran can find products at and send to, then the stores it picked in Settings (`stores.yours`), whose sites can be searched. With an API key, it needs the `list: read` permission.
+         */
+        get: operations["yourStores"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stores/send-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Where each thing on a list can go
+         * @description For Send: the stores Merran can send to, and each thing left on the list with the stores the household picked a product at for it, newest first, which is where it goes (asking when there's more than one), and where it's been sent already. Each store's part is then reviewed and sent with its basket's `items`. With an API key, it needs the `list: read` permission.
+         */
+        get: operations["sendPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/stores/kroger": {
         parameters: {
             query?: never;
@@ -3321,7 +3361,7 @@ export interface paths {
         };
         /**
          * The Kroger cart to look over
-         * @description Each thing left on a list (the one asked for, the one the person's looking at; or without one the list for Kroger, else the lists for any store) with its product: the one the household picked before, at today's price, or Merran's pick from the store's search, made by the household's model for shopping when it has AI. How many packages, worked out from the product's size where it can be. Nothing is sent until `POST /stores/kroger/send`. With an API key, it needs the `list: write` permission.
+         * @description Each thing left to get (the ones asked for, which Send has going to Kroger; or without them, everything left on every list) with its product: the one the household picked before, at today's price, or Merran's pick from the store's search, made by the household's model for shopping when it has AI. How many packages, worked out from the product's size where it can be. Nothing is sent until `POST /stores/kroger/send`. With an API key, it needs the `list: write` permission.
          */
         get: operations["getKrogerBasket"];
         put?: never;
@@ -3421,7 +3461,7 @@ export interface paths {
         };
         /**
          * The Walmart cart to look over
-         * @description Experimental, when the server admin has turned Walmart on. Each thing left on a list (the one asked for, the one the person's looking at; or without one the list for Walmart, else the lists for any store) with its product, the household's own pick or Merran's, how many and what it cost when last seen; and what's still to find at Walmart, which Merran's browser extension looks for in the person's own Walmart tab. Merran never reaches Walmart itself. With an API key, it needs the `list: read` permission.
+         * @description Experimental, when the server admin has turned Walmart on. Each thing left to get (the ones asked for, which Send has going to Walmart; or without them, everything left on every list) with its product, the household's own pick or Merran's, how many and what it cost when last seen; and what's still to find at Walmart, which Merran's browser extension looks for in the person's own Walmart tab. Merran never reaches Walmart itself. With an API key, it needs the `list: read` permission.
          */
         get: operations["getWalmartBasket"];
         put?: never;
@@ -5420,14 +5460,12 @@ export interface components {
          *         {
          *           "id": "0199e8b0-5a10-7a01-8b00-00000000001c",
          *           "name": "Shopping list",
-         *           "store": null,
          *           "main": true,
          *           "aisles": []
          *         },
          *         {
          *           "id": "0199e8b0-5a10-7a01-8b00-000000000025",
          *           "name": "Costco",
-         *           "store": "costco",
          *           "main": false,
          *           "aisles": [
          *             "0199e8b0-5a10-7a01-8b00-000000000021"
@@ -5504,8 +5542,6 @@ export interface components {
         List: {
             id: string;
             name: string;
-            /** @description The store it's for, like "costco"; null for any. */
-            store: string | null;
             /** @description The main list, which takes what no other list does. */
             main: boolean;
             /** @description The ids of the aisles that go on it. */
@@ -5948,14 +5984,12 @@ export interface components {
          *         {
          *           "id": "0199e8b0-5a10-7a01-8b00-00000000001c",
          *           "name": "Shopping list",
-         *           "store": null,
          *           "main": true,
          *           "aisles": []
          *         },
          *         {
          *           "id": "0199e8b0-5a10-7a01-8b00-000000000025",
          *           "name": "Costco",
-         *           "store": "costco",
          *           "main": false,
          *           "aisles": [
          *             "0199e8b0-5a10-7a01-8b00-000000000021"
@@ -5973,12 +6007,10 @@ export interface components {
          *         {
          *           "id": "0199e8b0-5a10-7a01-8b00-00000000001c",
          *           "name": "Groceries",
-         *           "store": null,
          *           "aisles": []
          *         },
          *         {
          *           "name": "Costco",
-         *           "store": "costco",
          *           "aisles": [
          *             "0199e8b0-5a10-7a01-8b00-000000000021"
          *           ]
@@ -5991,7 +6023,6 @@ export interface components {
                 /** @description An existing list's id; none for a new one. */
                 id?: string | null;
                 name: string;
-                store: string | null;
                 aisles: string[];
             }[];
         };
@@ -9919,6 +9950,7 @@ export interface components {
          *       "currency": "USD",
          *       "items": {
          *         "0199e8b0-5a10-7a01-8b00-00000000001d": {
+         *           "store": "Fry's",
          *           "total": 598,
          *           "packages": 2,
          *           "sure": true,
@@ -9935,12 +9967,14 @@ export interface components {
          *     }
          */
         ListPrices: {
-            /** @description The household's store's banner, or null without one. */
+            /** @description The household's Kroger store's banner, or null without one. */
             store: string | null;
             currency: string;
-            /** @description By list item id, what's left to get on the list for the store. Things with no product kept for them, or no price, are left out. */
+            /** @description By list item id, what's left to get on every list, each at its store. Things with no product kept for them at a store, or no price, are left out. */
             items: {
                 [key: string]: {
+                    /** @description The store it's priced at: where the household picked a product for it, newest first, else its Kroger store. */
+                    store: string;
                     /** @description In cents, for the packages needed, at the sale price when there's a sale. */
                     total: number;
                     packages: number;
@@ -9966,6 +10000,85 @@ export interface components {
                     seenOn: string;
                 };
             };
+        };
+        /**
+         * @example {
+         *       "stores": [
+         *         {
+         *           "key": "kroger",
+         *           "name": "Fry's",
+         *           "connected": true,
+         *           "searchable": true
+         *         },
+         *         {
+         *           "key": "costco",
+         *           "name": "Costco",
+         *           "connected": false,
+         *           "searchable": true
+         *         }
+         *       ]
+         *     }
+         */
+        YourStores: {
+            stores: {
+                /** @description The store's key: "kroger". */
+                key: string;
+                /** @description As the household knows it: Fry's. */
+                name: string;
+                /** @description Merran can find its products and send to its cart: the household's Kroger store, and Walmart when the server has it on. */
+                connected: boolean;
+                /** @description Its site can be searched, in the household's country. */
+                searchable: boolean;
+            }[];
+        };
+        /**
+         * @example {
+         *       "stores": [
+         *         {
+         *           "key": "kroger",
+         *           "name": "Fry's"
+         *         },
+         *         {
+         *           "key": "walmart",
+         *           "name": "Walmart"
+         *         }
+         *       ],
+         *       "items": [
+         *         {
+         *           "itemId": "0199e8b0-5a10-7a01-8b00-00000000001d",
+         *           "name": "milk",
+         *           "amount": "1 gallon",
+         *           "picked": [
+         *             "walmart",
+         *             "kroger"
+         *           ],
+         *           "sent": []
+         *         },
+         *         {
+         *           "itemId": "0199e8b0-5a10-7a01-8b00-00000000001e",
+         *           "name": "eggs",
+         *           "amount": "12",
+         *           "picked": [],
+         *           "sent": []
+         *         }
+         *       ]
+         *     }
+         */
+        SendPlan: {
+            /** @description The stores Merran can send to. */
+            stores: {
+                key: string;
+                name: string;
+            }[];
+            items: {
+                itemId: string;
+                name: string;
+                amount: string | null;
+                /** @description The stores the household picked a product at for its food (someone picked it, or it was sent there before; Merran's own picks don't count), newest first. */
+                picked: string[];
+                /** @description The stores it's been sent to while it's on the list. */
+                sent: string[];
+            }[];
         };
         /**
          * @example {
@@ -20109,6 +20222,94 @@ export interface operations {
             };
         };
     };
+    yourStores: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The household's stores. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["YourStores"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    sendPlan: {
+        parameters: {
+            query: {
+                /** @description The list being sent: the one the person's looking at. */
+                list: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Where each thing can go. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SendPlan"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There's no such list. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     setKrogerStore: {
         parameters: {
             query?: never;
@@ -20344,8 +20545,8 @@ export interface operations {
     getKrogerBasket: {
         parameters: {
             query?: {
-                /** @description Just this list, the one the person's looking at. Without it, the store's own list, else the lists for no store in particular. */
-                list?: string;
+                /** @description Just these things on the list, by id, separated by commas: the ones Send has going to this store. Without it, everything left on every list. */
+                items?: string;
             };
             header?: never;
             path?: never;
@@ -20373,15 +20574,6 @@ export interface operations {
             };
             /** @description Not allowed. */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description There's no such list. */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -20630,8 +20822,8 @@ export interface operations {
     getWalmartBasket: {
         parameters: {
             query?: {
-                /** @description Just this list, the one the person's looking at. Without it, the store's own list, else the lists for no store in particular. */
-                list?: string;
+                /** @description Just these things on the list, by id, separated by commas: the ones Send has going to this store. Without it, everything left on every list. */
+                items?: string;
             };
             header?: never;
             path?: never;
@@ -20659,15 +20851,6 @@ export interface operations {
             };
             /** @description Not allowed. */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Error"];
-                };
-            };
-            /** @description There's no such list. */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };

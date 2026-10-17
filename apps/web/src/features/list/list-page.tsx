@@ -13,7 +13,7 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { STORES_BY_KEY, storeNamed, storeSearch } from "@merran/shared"
+import { storeSearch } from "@merran/shared"
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import * as React from "react"
@@ -45,7 +45,6 @@ import {
 import { Progress } from "@/components/ui/progress"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useActiveHousehold } from "@/features/auth/use-me"
-import { useCapability } from "@/features/capabilities/queries"
 import { isAdminRole } from "@/features/household/queries"
 import { usePeopleHere, type Person } from "@/features/live/live-updates"
 import { SelectionBar, SelectionHeader } from "@/features/select/selection-bar"
@@ -55,16 +54,20 @@ import {
 } from "@/features/select/use-selection"
 import { householdQuery } from "@/features/household/queries"
 import {
+  FindProductDialog,
+  type Finding,
+} from "@/features/stores/find-product-dialog"
+import {
   formatPrice,
-  storesQuery,
   useListPrices,
+  yourStoresQuery,
   type ItemPrice,
 } from "@/features/stores/queries"
 import { initials } from "@/lib/initials"
 import { cn } from "@/lib/utils"
 
 import { AddFromPlanDialog } from "./add-from-plan-dialog"
-import { ItemRow, type RowPrices } from "./item-row"
+import { ItemRow, type RowFind, type RowPrices } from "./item-row"
 import {
   AisleDialog,
   EditItemDialog,
@@ -112,32 +115,23 @@ export function ListPage() {
   const [chosen, setChosen] = React.useState(readChosenList)
 
   const { data: household } = useQuery(householdQuery)
-  const kroger = useCapability("stores.kroger")
-  const walmart = useCapability("stores.walmart")
-  const { data: stores } = useQuery({ ...storesQuery, enabled: kroger })
+  const { data: yours = [] } = useQuery(yourStoresQuery)
+  const [finding, setFinding] = React.useState<Finding | null>(null)
   /**
-   * The store a list is for: the one it's set to, else the one it's named
-   * for ("Walmart", or "Fry's" for the household's Kroger store).
+   * Find, at any of the household's stores: a store Merran can send to
+   * opens its product picker, and the pick is kept for that food there;
+   * any other opens its site's search.
    */
-  const storeOf = (one: { name: string; store: string | null } | undefined) => {
-    if (!one) return null
-    const banner = stores?.kroger.location?.banner
-    return (
-      one.store ??
-      storeNamed(
-        one.name,
-        household?.country,
-        banner ? [{ key: "kroger", name: banner }] : []
-      )
-    )
-  }
-  /** Where to find something on its list's store's site, if it has one. */
-  const findAt = (item: ListItem) => {
-    const store = storeOf(lists.find((option) => option.id === item.list))
-    const url = storeSearch(store, household?.country, item.name)
-    return store && url
-      ? { store: STORES_BY_KEY.get(store)?.name ?? store, url }
-      : null
+  const find: RowFind = {
+    stores: yours.filter((store) => store.connected || store.searchable),
+    onFind: (item, store) => {
+      if (store.connected) {
+        setFinding({ line: { itemId: item.id, name: item.name }, store })
+        return
+      }
+      const url = storeSearch(store.key, household?.country, item.name)
+      if (url) window.open(url, "_blank", "noopener,noreferrer")
+    },
   }
   const lists = list.data?.lists ?? []
   const aisles = list.data?.aisles ?? []
@@ -153,7 +147,7 @@ export function ListPage() {
   const priceOf = (item: ListItem) => prices.items.get(item.id) ?? null
   // A column of prices when anything left on the list showing has one.
   const rowPrices: RowPrices | null = toGet.some(priceOf)
-    ? { of: priceOf, currency: prices.currency, store: prices.store }
+    ? { of: priceOf, currency: prices.currency }
     : null
   // Each aisle's things A to Z, as they read.
   const byName = new Intl.Collator(i18n.language, { sensitivity: "base" })
@@ -188,21 +182,8 @@ export function ListPage() {
   useSelectionKeepOnly(selection, selectable)
   const picked = selectable.filter((id) => selection.isPicked(id))
   const elsewhere = lists.filter((option) => option.id !== current?.id)
-  // Sending is for the list showing, and only what's on it: to the
-  // household's Kroger store (Fry's, Ralphs...) and to Walmart through the
-  // extension (experimental, when the server has it on, on walmart.com),
-  // from a list for that store or for no store in particular.
-  const showingStore = storeOf(current)
-  const krogerStore = stores?.kroger.location?.banner
-  const toKroger =
-    krogerStore &&
-    toGet.length > 0 &&
-    (showingStore === "kroger" || showingStore === null)
-  const toWalmart =
-    walmart &&
-    toGet.length > 0 &&
-    (household?.country ?? "US") === "US" &&
-    (showingStore === "walmart" || showingStore === null)
+  // Send, for the list showing: each thing to the store it's picked at.
+  const canSend = yours.some((store) => store.connected) && toGet.length > 0
   /** The list showing, when there's more than one. */
   const listShowing = split ? current?.id : undefined
 
@@ -243,11 +224,11 @@ export function ListPage() {
             <SelectionHeader selection={selection} allIds={selectable} />
           ) : (
             <>
-              {toKroger && (
+              {canSend && current && (
                 <Button
                   variant="outline"
                   render={
-                    <Link to="/list/kroger" search={{ list: current?.id }} />
+                    <Link to="/list/send" search={{ list: current.id }} />
                   }
                 >
                   <HugeiconsIcon
@@ -255,22 +236,7 @@ export function ListPage() {
                     strokeWidth={2}
                     data-icon="inline-start"
                   />
-                  {t("list.sendTo", { store: krogerStore })}
-                </Button>
-              )}
-              {toWalmart && (
-                <Button
-                  variant="outline"
-                  render={
-                    <Link to="/list/walmart" search={{ list: current?.id }} />
-                  }
-                >
-                  <HugeiconsIcon
-                    icon={ShoppingCart01Icon}
-                    strokeWidth={2}
-                    data-icon="inline-start"
-                  />
-                  {t("list.sendTo", { store: "Walmart" })}
+                  {t("list.send")}
                 </Button>
               )}
               <Button onClick={() => setFromPlan(true)}>
@@ -415,7 +381,7 @@ export function ListPage() {
                       item={item}
                       selection={selection}
                       onEdit={() => setEditing(item)}
-                      findAt={findAt(item)}
+                      find={find}
                       prices={rowPrices}
                     />
                   ))}
@@ -489,7 +455,7 @@ export function ListPage() {
                         item={item}
                         selection={selection}
                         onEdit={() => setEditing(item)}
-                        findAt={findAt(item)}
+                        find={find}
                       />
                     ))}
                   </ul>
@@ -587,6 +553,7 @@ export function ListPage() {
       <EveryWeekDialog open={everyWeek} onOpenChange={setEveryWeek} />
       <OnHandDialog open={onHand} onOpenChange={setOnHand} />
       <FoodsDialog open={foods} onOpenChange={setFoods} />
+      <FindProductDialog finding={finding} onClose={() => setFinding(null)} />
       <ListsDialog
         open={managing}
         onOpenChange={setManaging}

@@ -1,4 +1,4 @@
-import { foodKey, STORES_BY_KEY } from "@merran/shared"
+import { foodKey } from "@merran/shared"
 import type { EntityManager } from "@mikro-orm/sql"
 import { AppError } from "../../core/errors.ts"
 import {
@@ -10,9 +10,11 @@ import {
 import { inHouseholdTransaction } from "../recipes/recipes.ts"
 import { householdKeys } from "./food-aliases.ts"
 
-// A household's lists, one for each store it shops at. Things go on the
-// main list unless the household moved that food to another list before,
-// or its aisle goes on another list.
+// A household's lists, for however it likes to sort what it buys (the
+// corner shop, a festival, the big monthly shop). Things go on the main
+// list unless the household moved that food to another list before, or
+// its aisle goes on another list. Stores are chosen for each thing, when
+// it's found or sent (docs/platform.md, Stores).
 
 /** The most lists a household can have. */
 export const MAX_LISTS = 10
@@ -48,7 +50,6 @@ export function describeList(list: ShoppingList) {
   return {
     id: list.id,
     name: list.name,
-    store: list.store ?? null,
     main: list.main,
     aisles: list.main ? [] : (list.aisles ?? []),
   }
@@ -134,8 +135,6 @@ export type ListInput = {
   /** An existing list's id; none for a new one. */
   id?: string | null
   name: string
-  /** A store's key from STORES, or none. */
-  store: string | null
   /** The ids of the aisles that go on it. The main list takes the rest. */
   aisles: string[]
 }
@@ -171,12 +170,7 @@ export async function saveLists(
           "list_not_found",
           "There's no such list."
         )
-      if (input.store && !STORES_BY_KEY.has(input.store))
-        throw invalid("Merran doesn't know that store.")
     }
-    const stores = inputs.flatMap((input) => (input.store ? [input.store] : []))
-    if (new Set(stores).size !== stores.length)
-      throw invalid("One list for each store.")
     const others = inputs.filter((input) => input.id !== main.id)
     const aisles = others.flatMap((input) => input.aisles)
     if (new Set(aisles).size !== aisles.length)
@@ -206,7 +200,6 @@ export async function saveLists(
     for (const [position, input] of inputs.entries()) {
       const values = {
         name: input.name.trim(),
-        store: input.store,
         aisles: input.id === main.id ? null : input.aisles,
         position,
       }

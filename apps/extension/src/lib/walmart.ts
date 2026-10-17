@@ -601,11 +601,16 @@ function fillsFor(
   return { fills: [...fills.values()], skipped }
 }
 
-/** The cart as Merran has it: for one list, the one the person's looking at, if it's given. */
-const basketOf = (connection: Connection, list: string | undefined) =>
+/** The cart as Merran has it: for just these things, if they're given. */
+const basketOf = (
+  connection: Connection,
+  items: readonly string[] | undefined
+) =>
   unwrap(
     apiFor(connection).GET("/api/stores/walmart/basket", {
-      params: { query: list ? { list } : {} },
+      params: {
+        query: items && items.length > 0 ? { items: items.join(",") } : {},
+      },
     }),
     connection.origin
   )
@@ -626,13 +631,15 @@ export async function answerPage<C extends ExtensionCommand>(
   if (!all.some((one) => one.origin === origin)) {
     return command === "status" ? statusFor(origin) : no("household")
   }
-  const { householdId, lines, words, list } = args as {
+  const { householdId, lines, words, items } = args as {
     householdId?: string
     lines?: { itemId: string; packages: number }[]
     words?: string
-    list?: unknown
+    items?: unknown
   }
-  const listId = typeof list === "string" && list ? list : undefined
+  const itemIds = Array.isArray(items)
+    ? items.filter((id): id is string => typeof id === "string").slice(0, 300)
+    : undefined
   const connection =
     typeof householdId === "string"
       ? await connectionFor(origin, householdId)
@@ -658,7 +665,7 @@ export async function answerPage<C extends ExtensionCommand>(
       const cant = await claim()
       if (cant) return cant
       try {
-        const basket = await basketOf(connection, listId)
+        const basket = await basketOf(connection, itemIds)
         const job = newJob(origin, connection.householdId, beside, merranTab, {
           kind: "find",
           todo: basket.toFind,
@@ -677,16 +684,20 @@ export async function answerPage<C extends ExtensionCommand>(
       const cant = await claim()
       if (cant) return cant
       try {
+        const wanted = lines
+          .filter(
+            (line) =>
+              typeof line?.itemId === "string" &&
+              Number.isInteger(line.packages) &&
+              line.packages > 0
+          )
+          .slice(0, 300)
         const { fills, skipped } = fillsFor(
-          await basketOf(connection, listId),
-          lines
-            .filter(
-              (line) =>
-                typeof line?.itemId === "string" &&
-                Number.isInteger(line.packages) &&
-                line.packages > 0
-            )
-            .slice(0, 300)
+          await basketOf(
+            connection,
+            wanted.map((line) => line.itemId)
+          ),
+          wanted
         )
         const job = newJob(origin, connection.householdId, beside, merranTab, {
           kind: "fill",

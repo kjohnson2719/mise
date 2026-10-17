@@ -209,47 +209,63 @@ describe("Walmart", () => {
     )
   })
 
-  test("sends just the list being looked at, when it's asked for", async () => {
-    const { lists } = (await (await kyle.get("/api/list")).json()) as {
-      lists: { id: string; name: string }[]
-    }
-    // Named for the store, but not set to it: a list for no store.
-    const saved = await kyle.put("/api/list/lists", {
-      lists: [
-        { id: lists[0]!.id, name: lists[0]!.name, store: null, aisles: [] },
-        { name: "Walmart", store: null, aisles: [] },
-      ],
-    })
-    expect(saved.status, await saved.clone().text()).toBe(200)
-    const walmartList = (
-      (await saved.json()) as { lists: { id: string; name: string }[] }
-    ).lists.find((one) => one.name === "Walmart")!
-    await kyle.post("/api/list/items", {
-      text: "paper towels",
-      list: walmartList.id,
-    })
-
-    // Without a list: every list for no store, both of them.
-    const names = (await basket()).lines.map((one) => one.name)
-    expect(names.some((name) => /paper towel/.test(name))).toBe(true)
-    expect(names.some((name) => /milk/.test(name))).toBe(true)
-
-    // The list being looked at: just its own.
+  test("reviews just the things asked for: Send's part for Walmart", async () => {
+    const { lines } = await basket()
+    const milk = lines.find((one) => one.name === "milk")!
     const res = await kyle.get(
-      `/api/stores/walmart/basket?list=${walmartList.id}`
+      `/api/stores/walmart/basket?items=${milk.itemId}`
     )
     expect(res.status, await res.clone().text()).toBe(200)
     const one = (await res.json()) as Awaited<ReturnType<typeof basket>>
-    expect(one.lines).toHaveLength(1)
-    expect(one.lines[0]!.name).toMatch(/paper towel/)
-    expect(one.toFind.map((thing) => thing.words)).toHaveLength(1)
-
-    const none = await kyle.get(
-      "/api/stores/walmart/basket?list=0199e8b0-5a10-7a01-8b00-000000000000"
-    )
-    expect(none.status).toBe(404)
-    const nonsense = await kyle.get("/api/stores/walmart/basket?list=nope")
+    expect(one.lines.map((line) => line.itemId)).toEqual([milk.itemId])
+    expect(one.toFind).toEqual([])
+    const nonsense = await kyle.get("/api/stores/walmart/basket?items=nope")
     expect(nonsense.status).toBe(400)
+  })
+
+  test("says which stores each thing on a list is picked at, for Send", async () => {
+    const { lists } = (await (await kyle.get("/api/list")).json()) as {
+      lists: { id: string }[]
+    }
+    const res = await kyle.get(`/api/stores/send-plan?list=${lists[0]!.id}`)
+    expect(res.status, await res.clone().text()).toBe(200)
+    const plan = (await res.json()) as {
+      stores: { key: string; name: string }[]
+      items: { name: string; picked: string[]; sent: string[] }[]
+    }
+    // No Kroger store here, so Walmart only.
+    expect(plan.stores).toEqual([{ key: "walmart", name: "Walmart" }])
+    const of = (name: string) => plan.items.find((one) => one.name === name)!
+    // A person picked the milk at Walmart, and it was sent there.
+    expect(of("milk")).toMatchObject({ picked: ["walmart"], sent: ["walmart"] })
+    // Nothing picked for salt: Send puts it with the rest.
+    expect(of("Pinch of salt")).toMatchObject({ picked: [], sent: [] })
+    const missing = await kyle.get(
+      "/api/stores/send-plan?list=0199e8b0-5a10-7a01-8b00-000000000000"
+    )
+    expect(missing.status).toBe(404)
+  })
+
+  test("are the household's stores: Walmart, and the ones it picked", async () => {
+    const before = await (await kyle.get("/api/stores/yours")).json()
+    expect(before.stores).toEqual([
+      { key: "walmart", name: "Walmart", connected: true, searchable: true },
+    ])
+    const saved = await kyle.patch("/api/settings/household", {
+      "stores.yours": ["costco", "aldi", "walmart"],
+    })
+    expect(saved.status, await saved.clone().text()).toBe(200)
+    const after = await (await kyle.get("/api/stores/yours")).json()
+    expect(after.stores).toEqual([
+      { key: "walmart", name: "Walmart", connected: true, searchable: true },
+      { key: "costco", name: "Costco", connected: false, searchable: true },
+      // Aldi's US site has no search Merran knows.
+      { key: "aldi", name: "Aldi", connected: false, searchable: false },
+    ])
+    const wrong = await kyle.patch("/api/settings/household", {
+      "stores.yours": ["nope"],
+    })
+    expect(wrong.status).toBe(400)
   })
 
   test("takes only Walmart's own pages from the extension", async () => {
