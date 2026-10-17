@@ -50,6 +50,7 @@ test("the next summary can be seen before saying yes to it", async () => {
       stores: false,
       errorTracking: false,
       telemetry: false,
+      updates: true,
     },
     households: "1",
     people: "2-5",

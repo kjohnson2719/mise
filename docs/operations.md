@@ -102,7 +102,7 @@ Every outside call Merran can make, when, and how to stop it. This table also go
 ### Images
 
 - **Prebuilt images on GitHub's registry:** `ghcr.io/merran-app/merran`, for `amd64` and `arm64` (so a Raspberry Pi 4 or 5 works).
-- **Tags:** `1.4.2`, `1.4`, `1`, `latest` (the newest release) and `edge` (every commit to main, for testers).
+- **Tags:** the version itself (`0.1.0-alpha.1`, `1.4.2`), which never moves; `next` (the newest release, pre-releases included); for a release that isn't a pre-release, `1.4`, `1` (from 1.0 on) and `latest`; and `edge` (every commit to main, for testers). The compose file uses `next` while Merran is in alpha.
 - **Signed and described:** each image is signed with cosign and carries an SBOM and build provenance, so anyone can check it came from this repo's CI.
 - **One image with everything,** yt-dlp and ffmpeg included (about 100 MB of the image), and Postgres's `pg_dump` so Merran can back up either database itself. Modules that aren't wanted are turned off rather than built out.
 - **Running as a normal user:** the container drops to `PUID`/`PGID` as in the REFERENCE app, or runs as any user set in compose.
@@ -139,10 +139,11 @@ Docs for each common way in: a Cloudflare Tunnel (in the compose file), Tailscal
 ## Releases and updates
 
 - **Semantic versions.** `0.x` while the API and export format may still change; `1.0` once they're promised stable.
-- **release-please** reads conventional commit messages, keeps `CHANGELOG.md` and opens a release pull request. Merging it tags the release, builds and signs the images, attaches the browser extension's zips, and writes the GitHub release notes.
+- **The Release workflow** (`.github/workflows/release.yml`), run by hand on main with a version: every check again, then the images for amd64 and arm64 with the version baked in (`MERRAN_VERSION`), signed with cosign (keyless, so anyone can check they came from this repo's workflow), the browser extension's zips, and the GitHub release, tagged `v<version>`, with notes from the commits since the last one. Pre-releases (`0.1.0-alpha.1`) are marked so, and don't move `latest`. Commit messages stay plain English; there's no release-please or conventional commits.
+- **CI** (`.github/workflows/ci.yml`, with the checks in `check.yml`): every push to main and pull request runs the checks on SQLite and Postgres, builds the extension and the image, and main publishes `edge`, versioned `0.0.0-edge.<commit>`.
 - **Database changes run at startup.** Before applying any, Merran backs the database up into `data/backups` (`pre-1.5.0-<date>`), so a bad update can always be undone.
 - **Downgrades aren't supported,** and the release notes say when an update can't be undone without that dump.
-- **The update check** asks GitHub for the latest release (not commits, as the REFERENCE app did), every 6 hours. The server admin sees an Update badge and the release notes, with the commands for their install method. `MERRAN_UPDATE_CHECK=false` turns it off.
+- **The update check** (the Update check module) asks GitHub for Merran's releases (not commits, as the REFERENCE app did) every 6 hours, and a minute after Merran starts. A server on a pre-release hears about newer pre-releases too; one on a release only about releases; a build that isn't a release (from source, or `edge`) isn't checked. The server admin sees an Update badge in the sidebar and the account menu, and Settings → This server shows the release notes and the commands for their install method, with **Look now**. `MERRAN_UPDATE_CHECK=false` turns it off; only the request for the releases is sent.
 - **Support:** the latest minor version gets fixes. Security fixes go to the latest minor of the current major.
 
 ## Backups and restore

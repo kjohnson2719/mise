@@ -102,6 +102,13 @@ export const BOOT_SETTINGS = {
     }),
     default: [],
   }),
+  version: textSetting({
+    key: "server.version",
+    env: "MERRAN_VERSION",
+    envOnly: true,
+    description:
+      "The release this is: the Docker image sets it. From source, it's the server package's version.",
+  }),
   installMethod: choiceSetting({
     key: "server.installMethod",
     env: "MERRAN_INSTALL_METHOD",
@@ -172,7 +179,7 @@ export function loadConfig(
   const bootKeys = new Set(boot.map((setting) => setting.key))
 
   return {
-    version: packageJson.version,
+    version: read(BOOT_SETTINGS.version) ?? packageJson.version,
     installMethod: read(BOOT_SETTINGS.installMethod),
     port: read(BOOT_SETTINGS.port),
     logLevel: read(BOOT_SETTINGS.logLevel),

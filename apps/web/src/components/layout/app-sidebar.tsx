@@ -15,6 +15,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
+import { UpdateSidebarItem } from "@/features/server/updates"
+
 import { isSectionActive, PRIMARY_NAV } from "./nav-items"
 import { SidebarUserMenu } from "./user-menu"
 
@@ -56,6 +58,7 @@ export function AppSidebar() {
       </SidebarContent>
 
       <SidebarFooter>
+        <UpdateSidebarItem />
         <SidebarUserMenu />
       </SidebarFooter>
     </Sidebar>

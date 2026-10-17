@@ -2,13 +2,15 @@
 **/dist
 **/coverage
 **/*.tsbuildinfo
-**/data
+# Where Merran keeps its data while developing, not the code's data
+# (packages/shared/src/foods/data is the food vocabulary).
+data
+apps/server/data
 .git
 .github
 .claude
 .vscode
 docs
-apps/REFERENCE
 .env
 .env.*
 *.log

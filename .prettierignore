@@ -4,7 +4,6 @@ coverage/
 pnpm-lock.yaml
 dist/
 docs/
-apps/REFERENCE/
 apps/server/src/database/migrations/
 apps/server/src/http/openapi/openapi.json
 apps/web/src/routeTree.gen.ts

@@ -11494,6 +11494,114 @@
         },
         "example": {}
       },
+      "Updates": {
+        "type": "object",
+        "properties": {
+          "current": {
+            "type": "string",
+            "description": "The version running."
+          },
+          "devBuild": {
+            "type": "boolean",
+            "description": "Not a release (from source, or the edge image), so it isn't checked."
+          },
+          "checking": {
+            "type": "boolean",
+            "description": "It looks every 6 hours: on unless MERRAN_UPDATE_CHECK says no."
+          },
+          "checkedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last look didn't work, if it didn't."
+          },
+          "latest": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "version": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "notes": {
+                "type": "string",
+                "description": "In Markdown."
+              },
+              "publishedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "prerelease": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "version",
+              "name",
+              "url",
+              "notes",
+              "publishedAt",
+              "prerelease"
+            ],
+            "description": "The newest release this server would update to: pre-releases too when it runs one."
+          },
+          "newer": {
+            "type": "boolean",
+            "description": "The latest is newer than what's running."
+          },
+          "installMethod": {
+            "type": "string",
+            "enum": [
+              "source",
+              "docker"
+            ]
+          }
+        },
+        "required": [
+          "current",
+          "devBuild",
+          "checking",
+          "checkedAt",
+          "error",
+          "latest",
+          "newer",
+          "installMethod"
+        ],
+        "example": {
+          "current": "0.1.0-alpha.1",
+          "devBuild": false,
+          "checking": true,
+          "checkedAt": "2026-10-20T18:53:00.000Z",
+          "error": null,
+          "latest": {
+            "version": "0.1.0-alpha.2",
+            "name": "Merran 0.1.0-alpha.2",
+            "url": "https://github.com/merran-app/merran/releases/tag/v0.1.0-alpha.2",
+            "notes": "## What's new\n\n- Send splits the list across your stores.",
+            "publishedAt": "2026-10-20T16:00:00Z",
+            "prerelease": true
+          },
+          "newer": true,
+          "installMethod": "docker"
+        }
+      },
       "VoiceSettings": {
         "type": "object",
         "properties": {
@@ -26637,6 +26745,100 @@
           },
           "502": {
             "description": "USDA didn't answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/server/updates": {
+      "get": {
+        "operationId": "getUpdates",
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Is there a newer Merran?",
+        "description": "Server admins only. The version running and the newest release the update check found on GitHub (it looks every 6 hours), with its notes, and whether it's newer.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What the update check found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updates"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/server/updates/check": {
+      "post": {
+        "operationId": "checkForUpdates",
+        "tags": [
+          "Settings"
+        ],
+        "summary": "Look for a newer Merran now",
+        "description": "Server admins only. Asks GitHub for Merran's releases now, rather than at the next 6-hourly look, and answers with what it found. Does nothing for a build that isn't a release, or when MERRAN_UPDATE_CHECK says no.",
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What the update check found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Updates"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
             "content": {
               "application/json": {
                 "schema": {

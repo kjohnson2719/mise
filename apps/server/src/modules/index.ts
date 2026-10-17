@@ -8,6 +8,7 @@ import { photos } from "./photos/index.ts"
 import { telemetry } from "./telemetry/index.ts"
 import { video } from "./video/index.ts"
 import { voice } from "./voice/index.ts"
+import { updates } from "./updates/index.ts"
 
 /** Every module, in the order Settings lists them. */
 export const MODULES: readonly Module[] = [
@@ -20,4 +21,5 @@ export const MODULES: readonly Module[] = [
   stores,
   errorTracking,
   telemetry,
+  updates,
 ]

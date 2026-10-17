@@ -10,8 +10,12 @@ import {
 } from "@/components/ui/card"
 
 import { serverSettingsQuery } from "./queries"
+import { UpdatesSection } from "./updates"
 
-/** What's running: the version, how it was installed, and its database. */
+/**
+ * What's running: the version, how it was installed, and its database; and
+ * whether there's a newer Merran, with how to update.
+ */
 export function AboutCard() {
   const { t } = useTranslation()
   const { data } = useSuspenseQuery(serverSettingsQuery)
@@ -41,7 +45,7 @@ export function AboutCard() {
           {t("settings.server.about.description")}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="grid gap-4">
         <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-[auto_1fr]">
           {rows.map(([label, value]) => (
             <div key={label} className="contents">
@@ -50,6 +54,7 @@ export function AboutCard() {
             </div>
           ))}
         </dl>
+        <UpdatesSection />
       </CardContent>
     </Card>
   )

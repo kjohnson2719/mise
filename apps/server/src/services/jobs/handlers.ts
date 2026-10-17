@@ -1,4 +1,5 @@
 import { sendTelemetryJob } from "../../modules/telemetry/send.ts"
+import { checkUpdatesJob } from "../../modules/updates/check.ts"
 import { aiPhotoRunJob } from "../ai-photos/runs.ts"
 import { appImportJob } from "../importers/job.ts"
 import { purgeDeletedJob } from "../recipes/deleted.ts"
@@ -34,6 +35,7 @@ export const JOB_HANDLERS: readonly JobHandler[] = [
   aiPhotoRunJob,
   checkPricesJob,
   rekeyFoodsJob,
+  checkUpdatesJob,
 ]
 
 /** Jobs that come round again, in the server's time. */
@@ -41,6 +43,8 @@ export const JOB_SCHEDULES: readonly JobSchedule[] = [
   { kind: purgeDeletedJob.kind, cron: "17 3 * * *" },
   { kind: cleanUpJobsJob.kind, cron: "27 3 * * *" },
   { kind: sendTelemetryJob.kind, cron: "41 4 * * *" },
+  // Merran's newest release, for the server admin's Update badge.
+  { kind: checkUpdatesJob.kind, cron: "53 */6 * * *" },
   // Each site is read every 6 hours; this finds the ones that are due.
   { kind: readSitesJob.kind, cron: "*/30 * * * *" },
   // Each household's prices are checked each morning; this finds them.

@@ -3004,6 +3004,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/server/updates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Is there a newer Merran?
+         * @description Server admins only. The version running and the newest release the update check found on GitHub (it looks every 6 hours), with its notes, and whether it's newer.
+         */
+        get: operations["getUpdates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/server/updates/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Look for a newer Merran now
+         * @description Server admins only. Asks GitHub for Merran's releases now, rather than at the next 6-hourly look, and answers with what it found. Does nothing for a build that isn't a release, or when MERRAN_UPDATE_CHECK says no.
+         */
+        post: operations["checkForUpdates"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/server/voice": {
         parameters: {
             query?: never;
@@ -9430,6 +9470,51 @@ export interface components {
         UsdaKeyTest: {
             /** @description A key to try before saving it; the saved one when left out. */
             usdaKey?: string;
+        };
+        /**
+         * @example {
+         *       "current": "0.1.0-alpha.1",
+         *       "devBuild": false,
+         *       "checking": true,
+         *       "checkedAt": "2026-10-20T18:53:00.000Z",
+         *       "error": null,
+         *       "latest": {
+         *         "version": "0.1.0-alpha.2",
+         *         "name": "Merran 0.1.0-alpha.2",
+         *         "url": "https://github.com/merran-app/merran/releases/tag/v0.1.0-alpha.2",
+         *         "notes": "## What's new\n\n- Send splits the list across your stores.",
+         *         "publishedAt": "2026-10-20T16:00:00Z",
+         *         "prerelease": true
+         *       },
+         *       "newer": true,
+         *       "installMethod": "docker"
+         *     }
+         */
+        Updates: {
+            /** @description The version running. */
+            current: string;
+            /** @description Not a release (from source, or the edge image), so it isn't checked. */
+            devBuild: boolean;
+            /** @description It looks every 6 hours: on unless MERRAN_UPDATE_CHECK says no. */
+            checking: boolean;
+            /** Format: date-time */
+            checkedAt: string | null;
+            /** @description Why the last look didn't work, if it didn't. */
+            error: string | null;
+            /** @description The newest release this server would update to: pre-releases too when it runs one. */
+            latest: {
+                version: string;
+                name: string;
+                url: string;
+                /** @description In Markdown. */
+                notes: string;
+                publishedAt: string | null;
+                prerelease: boolean;
+            } | null;
+            /** @description The latest is newer than what's running. */
+            newer: boolean;
+            /** @enum {string} */
+            installMethod: "source" | "docker";
         };
         /**
          * @example {
@@ -19651,6 +19736,82 @@ export interface operations {
             };
             /** @description USDA didn't answer. */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getUpdates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the update check found. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Updates"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    checkForUpdates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What the update check found. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Updates"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

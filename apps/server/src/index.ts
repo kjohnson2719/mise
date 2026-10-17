@@ -20,6 +20,7 @@ import { rekeyFoodsSoon } from "./services/list/rekey.ts"
 import { createSettings } from "./services/settings/settings.ts"
 import { LocalFileStore } from "./services/storage/files.ts"
 import { createVideoTools } from "./services/video/tools.ts"
+import { checkUpdatesSoon } from "./modules/updates/check.ts"
 
 let config: Config
 try {
@@ -118,6 +119,8 @@ const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
 await jobs.start()
 // Food keys made a new way: the ones kept are made again, once.
 await rekeyFoodsSoon(database.em.fork())
+// A look for a newer release, rather than waiting for the next 6 hours.
+await checkUpdatesSoon(database.em.fork())
 
 function shutDown(signal: NodeJS.Signals) {
   logger.info(`${signal}: shutting down`)

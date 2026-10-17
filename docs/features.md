@@ -32,8 +32,8 @@ Keep this page current: when a feature is built, changed, planned or dropped, up
 | The telemetry receiver and public totals page | Detail | Planned | |
 | Background jobs that survive restarts, with a jobs page | Detail | Built | |
 | Problems page for the server admin | Detail | Planned | |
-| Update badge when a new release is out | Detail | Planned | |
-| Prebuilt, signed images; releases with notes | Detail | Planned | Only `edge` images so far |
+| Update badge when a new release is out | Detail | Built | GitHub's releases every 6 hours (pre-releases for a server on one), a badge for the server admin in the sidebar and account menu, the notes and update commands in Settings, This server |
+| Prebuilt, signed images; releases with notes | Detail | Built | A Release workflow run with a version: images for amd64 and arm64, signed with cosign, with an SBOM and provenance; the extension's zips; notes from the commits; `edge` from every commit to main |
 | Backups before migrations, and a restore test | Detail | Planned | |
 | Unraid template, docs site, public demo | Key | Planned | |
 

@@ -1,5 +1,9 @@
 name: CI
 
+# Each push to main and each pull request: every check, then the Docker
+# image. Pull requests build it to check it; main publishes it as `edge`,
+# the newest commit, for testers. Releases are made by the Release workflow.
+
 on:
   push:
     branches: [main]
@@ -14,45 +18,7 @@ concurrency:
 
 jobs:
   check:
-    name: Check and test
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18
-        env:
-          POSTGRES_PASSWORD: merran
-        ports:
-          - 5433:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-    env:
-      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
-      MERRAN_TEST_POSTGRES_URL: postgres://postgres:merran@localhost:5433/postgres
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version-file: .nvmrc
-      - run: corepack enable
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm format:check
-      - run: pnpm typecheck
-      - run: pnpm --filter @merran/web check:contrast
-      - run: pnpm --filter @merran/web build
-      # The web app's API types come from openapi.json, and its route tree
-      # from its route files: both are committed, so both must be current.
-      - run: pnpm --filter @merran/web api
-      - name: Check generated files are committed
-        run: git diff --exit-code -- apps/web/src/lib/api/schema.d.ts apps/web/src/routeTree.gen.ts
-      # On SQLite and on Postgres. The tests also check that the migrations
-      # match the entities, that openapi.json is current, and that each
-      # route file sits where its path says.
-      - run: pnpm --filter @merran/server test:all
-      # The ingredient parser, units and scaling the server and web app share.
-      - run: pnpm --filter @merran/shared test
+    uses: ./.github/workflows/check.yml
 
   image:
     name: Docker image
@@ -75,9 +41,13 @@ jobs:
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
           tags: |
             type=edge,branch=main
             type=sha
+      # An edge build says which commit it is, and isn't checked for updates.
+      - id: version
+        run: echo "version=0.0.0-edge.${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       # Pull requests build for amd64 to check the image; main builds both
       # architectures and publishes `edge`.
       - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -85,6 +55,7 @@ jobs:
           context: .
           push: ${{ github.event_name == 'push' }}
           platforms: ${{ github.event_name == 'push' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          build-args: MERRAN_VERSION=${{ steps.version.outputs.version }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           provenance: mode=max

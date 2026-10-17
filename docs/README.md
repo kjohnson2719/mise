@@ -2,9 +2,9 @@
 
 Merran is a self-hosted meal planner for households, with an AI cooking assistant at its center: recipes, weekly plans, a shopping list, a pantry, nutrition and store connections, made for a phone or tablet on the kitchen counter. One server can host several households, and a person can belong to more than one.
 
-It's a full rewrite of the app that was called Mise and then Nourvio. That app (now in `apps/REFERENCE/`, with its docs in `apps/REFERENCE/docs/`) was a place to try ideas out, and most of them worked. Merran builds them again, properly, as an open-source project anyone can run.
+It's a full rewrite of the app that was called Mise and then Nourvio, which these docs call the REFERENCE app. That app was a place to try ideas out, and most of them worked; Merran builds them again, properly, as an open-source project anyone can run. It sat in `apps/REFERENCE/` while Merran was built, and was removed once Merran had everything it did (it's in the repo's history before 0.1.0-alpha.1).
 
-**Status:** planning. Nothing is built yet.
+**Status:** alpha. Everything the REFERENCE app did is built, with much of the new work; releases start at 0.1.0-alpha.1, and 0.1.0 comes once the rest of [scope.md](scope.md) is done.
 
 ## What's different this time
 
@@ -41,7 +41,7 @@ It's a full rewrite of the app that was called Mise and then Nourvio. That app (
 | [scope.md](scope.md) | Where each REFERENCE feature lands, what's not coming over, and the build order |
 | [foods.md](foods.md) | One vocabulary of foods: names in every language, kinds of, brands, what Merran knows about each, and matching a line to its food |
 
-The REFERENCE app's docs (`apps/REFERENCE/docs/`) still describe each feature in detail, and these docs link to them rather than repeat them.
+The REFERENCE app's docs described each feature in detail; they're in the repo's history with it.
 
 ## Decisions so far
 
@@ -80,7 +80,7 @@ Decided with the user on October 15, 2026, from the plan's open questions:
 | Primitives under shadcn/ui | Base UI |
 | AI-written contributions | Welcome, with the parts an AI wrote named in the pull request, and the contributor answerable for every line |
 | A telemetry receiver | Yes: small, opt-in, its code public, with a public totals page |
-| The REFERENCE docs | Moved to `apps/REFERENCE/docs/`, so `docs/` is Merran's |
+| The REFERENCE app and its docs | Kept in `apps/REFERENCE/` while Merran was built, removed once Merran had everything it did |
 | The database | SQLite or Postgres, like Mealie, with SQLite the default |
 | The schema | Defined in TypeScript, not SQL |
 | Showing new people around | Guided tours with driver.js |

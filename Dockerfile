@@ -4,6 +4,9 @@
 #
 #   docker build -t merran .
 #   docker run -p 3000:3000 -v ./data:/data merran
+#
+# Releases are built by .github/workflows/release.yml, as
+# ghcr.io/merran-app/merran:<version>.
 
 FROM node:24-slim AS base
 ENV PNPM_HOME=/pnpm \
@@ -73,6 +76,11 @@ RUN apt-get update \
     && apt-get purge -y curl xz-utils && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
     && command -v setpriv && ffmpeg -version | head -n 1 && /opt/yt-dlp/yt-dlp --version
+
+# The release this is (CI passes it: 0.1.0-alpha.1, or 0.0.0-edge.<commit>),
+# after the tools so a new version doesn't download them again.
+ARG MERRAN_VERSION=0.0.0-dev
+ENV MERRAN_VERSION=$MERRAN_VERSION
 
 WORKDIR /app
 COPY --from=deps /app/node_modules node_modules

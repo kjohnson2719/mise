@@ -1,6 +1,6 @@
 # Scope and build order
 
-What comes over from the REFERENCE app, what's new, what changes on the way, and the order to build it in. The features are described in full in the REFERENCE docs ([product.md](../apps/REFERENCE/docs/product.md), [roadmap.md](../apps/REFERENCE/docs/roadmap.md)); this page only says where each one lands.
+What comes over from the REFERENCE app, what's new, what changes on the way, and the order to build it in. The features were described in full in the REFERENCE docs (`product.md` and `roadmap.md`, in the repo's history before 0.1.0-alpha.1); this page only says where each one lands.
 
 **The first release, 0.1, has everything the REFERENCE app does, plus new work** (decided October 15, 2026): the platform (SQLite or Postgres, household AI keys, API keys, SSO, export, translations, units both ways, belonging to more than one household, guided tours), the pool of meals (M16), fridge, freezer or cupboard and usual buys (M17), working offline (M17), reminders and the install button (M12), smarter deals and saying why (M15), and webhooks and an MCP server.
 
@@ -137,7 +137,7 @@ Each phase ends with something that runs and can be tried, on `edge` images. 0.1
 
 ### Phase 0: Foundation
 
-- The repo: pnpm workspace (`apps/server`, `apps/web`, `apps/extension`, `apps/docs`, `apps/telemetry`, `packages/shared`), with REFERENCE kept aside, read-only
+- The repo: pnpm workspace (`apps/server`, `apps/web`, `apps/extension`, `apps/docs`, `apps/telemetry`, `packages/shared`), with REFERENCE kept aside, read-only, until Merran had everything it did
 - CI with every check in [open-source.md](open-source.md#keeping-the-code-healthy), Renovate, release-please, and `edge` images published to GHCR
 - The settings schema and the module registry, with `GET /api/capabilities`
 - Hono with OpenAPI routes, the generated client, `/api/docs`

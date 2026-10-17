@@ -9,7 +9,10 @@
 
 services:
   merran:
-    image: ${MERRAN_IMAGE:-ghcr.io/merran-app/merran:edge}
+    # next: the newest release, pre-releases included. latest: the newest
+    # 0.1 or later, once there is one. edge: every commit to main, for
+    # testers. Or a version of its own, to stay on it: 0.1.0-alpha.1.
+    image: ${MERRAN_IMAGE:-ghcr.io/merran-app/merran:next}
     restart: unless-stopped
     ports:
       - "${MERRAN_PORT:-3000}:3000"

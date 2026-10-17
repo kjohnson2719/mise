@@ -1,6 +1,6 @@
 # Platform
 
-How Merran is put together underneath the features: modules and settings, accounts and households, API keys and the public API, AI keys at the server and household level, the database, jobs, files, keeping households apart, security, languages, and help and guided tours. The features themselves are in [scope.md](scope.md) and, in detail, in the REFERENCE app's [product.md](../apps/REFERENCE/docs/product.md).
+How Merran is put together underneath the features: modules and settings, accounts and households, API keys and the public API, AI keys at the server and household level, the database, jobs, files, keeping households apart, security, languages, and help and guided tours. The features themselves are in [scope.md](scope.md) and [features.md](features.md).
 
 ## Modules: everything optional
 
@@ -25,6 +25,7 @@ Merran's core needs nothing but Merran itself: it runs on SQLite out of the box,
 | **Error tracking** | Errors sent to the operator's own Sentry, GlitchTip or Bugsink | A DSN | Off |
 | **Metrics** | A Prometheus `/metrics` endpoint | Nothing | Off |
 | **Telemetry** | An anonymous daily summary sent to the Merran project | The server admin opting in | Off |
+| **Update check** | Merran's newest release from GitHub every 6 hours, for the server admin's Update badge | Nothing | On (`MERRAN_UPDATE_CHECK=false` turns it off) |
 
 **How a module is built.** Each module lives in its own folder and declares, in one place:
 - its settings (with their environment variables), as a Zod schema
@@ -200,7 +201,7 @@ The same encryption covers every other secret Merran stores: Kroger tokens, SMTP
 
 ### Other AI rules carried over
 
-- **The AI proposes, people apply.** AI never writes to recipes, the plan, the list or the pantry directly; it makes proposals to review (see the REFERENCE [architecture.md](../apps/REFERENCE/docs/architecture.md#proposals-how-the-ai-changes-things)).
+- **The AI proposes, people apply.** AI never writes to recipes, the plan, the list or the pantry directly; it makes proposals to review, as the REFERENCE app's did.
 - **Prompts live in files,** versioned and tested, and ask for replies in the person's language.
 - **Tests never spend money:** AI SDK's mock models and recorded responses.
 - **Later:** the providers' batch APIs for library runs (half price), and a small set of real pages, photos and receipts to compare models, which helps people choosing a local model.

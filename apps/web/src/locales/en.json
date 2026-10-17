@@ -1776,6 +1776,27 @@
       "forgetName": "Forget {{name}}"
     }
   },
+  "updates": {
+    "badge": "Merran {{version}} is out",
+    "isOut": "Merran {{version}} is out",
+    "prerelease": "Pre-release",
+    "howDocker": "To update, pull the new image and start Merran again. Your data stays in the data folder, and Merran backs the database up before it changes anything.",
+    "howSource": "To update from the source code, check out the release, then build and start Merran again.",
+    "compose": "With Docker Compose",
+    "composeHint": "When the compose file's image is the next or latest tag, as it is to start.",
+    "pinned": "Or this release's own image, to pin it",
+    "fromSource": "From the source code",
+    "onGithub": "The release on GitHub",
+    "devBuild": "A development build (from source, or the edge image), so it isn't checked for updates.",
+    "off": "Merran doesn't look for updates on this server.",
+    "checked": "Up to date. Merran last looked {{when}}.",
+    "notYet": "Merran hasn't looked for updates yet.",
+    "upToDate": "Merran is up to date.",
+    "couldNot": "Merran couldn't look for updates: {{error}}",
+    "switch": "Look for updates",
+    "switchHint": "Every 6 hours, Merran asks GitHub for its newest release. Nothing about this server is sent.",
+    "checkNow": "Look now"
+  },
   "send": {
     "title": "Send the list",
     "titleFor": "Send {{list}}",

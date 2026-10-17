@@ -180,3 +180,60 @@ export const TelemetryReportSchema = z
       recipes: "100-499",
     },
   })
+
+const RELEASE_EXAMPLE = {
+  version: "0.1.0-alpha.2",
+  name: "Merran 0.1.0-alpha.2",
+  url: "https://github.com/merran-app/merran/releases/tag/v0.1.0-alpha.2",
+  notes: "## What's new\n\n- Send splits the list across your stores.",
+  publishedAt: "2026-10-20T16:00:00Z",
+  prerelease: true,
+}
+
+export const UpdatesSchema = z
+  .object({
+    current: z.string().openapi({ description: "The version running." }),
+    devBuild: z.boolean().openapi({
+      description:
+        "Not a release (from source, or the edge image), so it isn't checked.",
+    }),
+    checking: z.boolean().openapi({
+      description:
+        "It looks every 6 hours: on unless MERRAN_UPDATE_CHECK says no.",
+    }),
+    checkedAt: z.iso.datetime().nullable(),
+    error: z
+      .string()
+      .nullable()
+      .openapi({ description: "Why the last look didn't work, if it didn't." }),
+    latest: z
+      .object({
+        version: z.string(),
+        name: z.string(),
+        url: z.string(),
+        notes: z.string().openapi({ description: "In Markdown." }),
+        publishedAt: z.string().nullable(),
+        prerelease: z.boolean(),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "The newest release this server would update to: pre-releases too when it runs one.",
+      }),
+    newer: z
+      .boolean()
+      .openapi({ description: "The latest is newer than what's running." }),
+    installMethod: z.enum(["source", "docker"]),
+  })
+  .openapi("Updates", {
+    example: {
+      current: "0.1.0-alpha.1",
+      devBuild: false,
+      checking: true,
+      checkedAt: "2026-10-20T18:53:00.000Z",
+      error: null,
+      latest: RELEASE_EXAMPLE,
+      newer: true,
+      installMethod: "docker",
+    },
+  })
