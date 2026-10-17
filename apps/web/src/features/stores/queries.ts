@@ -2,6 +2,7 @@ import { worthIt } from "@merran/shared"
 import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { useCapability } from "@/features/capabilities/queries"
+import { listQuery } from "@/features/list/queries"
 
 import { api, unwrap, type Schemas } from "@/lib/api/client"
 
@@ -21,24 +22,51 @@ export const storesQuery = queryOptions({
   queryFn: () => unwrap(api.GET("/api/stores")),
 })
 
-/** What the list is at Kroger: a product for each thing, and how many. */
-export const krogerBasketQuery = queryOptions({
-  queryKey: ["stores", "kroger", "basket"],
-  queryFn: () => unwrap(api.GET("/api/stores/kroger/basket")),
-  // Kroger's search and an AI pick: not something to redo on every focus.
-  staleTime: 5 * 60_000,
-  refetchOnWindowFocus: false,
-})
+/** Every list's cart at Kroger, to ask for again after a change. */
+const KROGER_BASKETS = ["stores", "kroger", "basket"] as const
 
 /**
- * What the list is at Walmart: the products kept and what's still to find,
- * which Merran's browser extension looks for. Only what Merran has: cheap
- * to ask again as the extension moves on.
+ * What a list is at Kroger: a product for each thing, and how many. The
+ * list the person's looking at; without one, Kroger's own list, else the
+ * lists for no store.
  */
-export const walmartBasketQuery = queryOptions({
-  queryKey: ["stores", "walmart", "basket"],
-  queryFn: () => unwrap(api.GET("/api/stores/walmart/basket")),
-})
+export const krogerBasketQuery = (list?: string) =>
+  queryOptions({
+    queryKey: [...KROGER_BASKETS, list ?? null],
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/stores/kroger/basket", {
+          params: { query: list ? { list } : {} },
+        })
+      ),
+    // Kroger's search and an AI pick: not something to redo on every focus.
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  })
+
+/**
+ * What a list is at Walmart: the products kept and what's still to find,
+ * which Merran's browser extension looks for. The list the person's
+ * looking at, as with Kroger. Only what Merran has: cheap to ask again as
+ * the extension moves on.
+ */
+export const walmartBasketQuery = (list?: string) =>
+  queryOptions({
+    queryKey: ["stores", "walmart", "basket", list ?? null],
+    queryFn: () =>
+      unwrap(
+        api.GET("/api/stores/walmart/basket", {
+          params: { query: list ? { list } : {} },
+        })
+      ),
+  })
+
+/** A list's name, when the household has more than one to tell apart. */
+export function useListName(list: string | undefined) {
+  const { data } = useQuery(listQuery)
+  if (!list || !data || data.lists.length < 2) return null
+  return data.lists.find((one) => one.id === list)?.name ?? null
+}
 
 /** What's on sale at the household's store, and the recipes it's in. */
 export const dealsQuery = queryOptions({
@@ -106,7 +134,7 @@ export function useSetStores() {
   const queryClient = useQueryClient()
   return (status: StoresStatus) => {
     queryClient.setQueryData(storesQuery.queryKey, status)
-    void queryClient.invalidateQueries({ queryKey: krogerBasketQuery.queryKey })
+    void queryClient.invalidateQueries({ queryKey: KROGER_BASKETS })
     void queryClient.invalidateQueries({ queryKey: dealsQuery.queryKey })
     void queryClient.invalidateQueries({ queryKey: costsQuery.queryKey })
     void queryClient.invalidateQueries({ queryKey: listPricesQuery.queryKey })

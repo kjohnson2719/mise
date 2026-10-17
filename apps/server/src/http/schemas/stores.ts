@@ -210,6 +210,17 @@ export const ProductsSchema = z
   .object({ products: z.array(ProductSchema) })
   .openapi("StoreProducts", { example: { products: [PRODUCT] } })
 
+export const BasketQuery = z.object({
+  list: z
+    .uuid()
+    .optional()
+    .openapi({
+      param: { name: "list", in: "query" },
+      description:
+        "Just this list, the one the person's looking at. Without it, the store's own list, else the lists for no store in particular.",
+    }),
+})
+
 export const SearchQuery = z.object({
   q: z
     .string()

@@ -1773,6 +1773,7 @@
     "basket": {
       "title": "{{store}} cart",
       "description": "From the list at {{location}}, for {{where}}. Look it over, then send it to the cart and check out on Kroger's site.",
+      "descriptionFor": "From your {{list}} list, at {{location}}, for {{where}}. Look it over, then send it to the cart and check out on Kroger's site.",
       "pickup": "pickup",
       "delivery": "delivery",
       "loadingTitle": "Finding everything",
@@ -1816,6 +1817,7 @@
     "walmart": {
       "title": "Walmart cart",
       "description": "From the list. Merran's browser extension finds each thing and fills your cart in a Walmart tab of your own; you check out on Walmart's site.",
+      "descriptionFor": "From your {{list}} list. Merran's browser extension finds each thing and fills your cart in a Walmart tab of your own; you check out on Walmart's site.",
       "experimental": "Experimental",
       "setup": "Walmart has no way in for Merran, so the extension does it in your own browser: it finds things and fills your cart in a Walmart tab, as you would. Each step ticks itself off once it's done.",
       "access": {

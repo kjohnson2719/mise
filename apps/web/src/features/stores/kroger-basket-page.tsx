@@ -27,6 +27,7 @@ import { ProductSearchDialog } from "./product-search-dialog"
 import {
   formatPrice,
   krogerBasketQuery,
+  useListName,
   type Basket,
   type BasketLine,
 } from "./queries"
@@ -36,9 +37,9 @@ import {
  * how many, to look over before it goes to the linked account's cart.
  * Kroger only lets Merran add to the cart; checking out is on its site.
  */
-export function KrogerBasketPage() {
+export function KrogerBasketPage({ list }: { list?: string }) {
   const { t } = useTranslation()
-  const basket = useQuery(krogerBasketQuery)
+  const basket = useQuery(krogerBasketQuery(list))
 
   return (
     <>
@@ -53,7 +54,11 @@ export function KrogerBasketPage() {
       </Button>
       {basket.data ? (
         // Afresh after each send: what went is left out next time.
-        <Review key={basket.data.sentAt ?? ""} basket={basket.data} />
+        <Review
+          key={basket.data.sentAt ?? ""}
+          basket={basket.data}
+          list={list}
+        />
       ) : basket.isPending ? (
         <>
           <PageHeader
@@ -85,8 +90,9 @@ export function KrogerBasketPage() {
   )
 }
 
-function Review({ basket }: { basket: Basket }) {
+function Review({ basket, list }: { basket: Basket; list?: string }) {
   const { t, i18n } = useTranslation()
+  const listName = useListName(list)
   const queryClient = useQueryClient()
   const { today } = useHouseholdClock()
   const admin = isAdminRole(useActiveHousehold()?.role)
@@ -131,7 +137,7 @@ function Review({ basket }: { basket: Basket }) {
   }
 
   function picked(line: BasketLine) {
-    queryClient.setQueryData(krogerBasketQuery.queryKey, (was) =>
+    queryClient.setQueryData(krogerBasketQuery(list).queryKey, (was) =>
       was
         ? {
             ...was,
@@ -169,7 +175,7 @@ function Review({ basket }: { basket: Basket }) {
         }
       )
       await queryClient.invalidateQueries({
-        queryKey: krogerBasketQuery.queryKey,
+        queryKey: krogerBasketQuery(list).queryKey,
       })
     } catch (err) {
       if (!(err instanceof ApiError)) throw err
@@ -183,10 +189,18 @@ function Review({ basket }: { basket: Basket }) {
     <>
       <PageHeader
         title={t("stores.basket.title", { store: basket.store })}
-        description={t("stores.basket.description", {
-          location: basket.location.name,
-          where,
-        })}
+        description={
+          listName
+            ? t("stores.basket.descriptionFor", {
+                list: listName,
+                location: basket.location.name,
+                where,
+              })
+            : t("stores.basket.description", {
+                location: basket.location.name,
+                where,
+              })
+        }
         actions={
           <Button
             disabled={!basket.linked || going.length === 0 || sending}

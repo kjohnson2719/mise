@@ -13,7 +13,7 @@ import {
   Tick02Icon,
 } from "@hugeicons/core-free-icons"
 import { HugeiconsIcon } from "@hugeicons/react"
-import { STORES_BY_KEY, storeSearch } from "@merran/shared"
+import { STORES_BY_KEY, storeNamed, storeSearch } from "@merran/shared"
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import * as React from "react"
@@ -115,9 +115,25 @@ export function ListPage() {
   const kroger = useCapability("stores.kroger")
   const walmart = useCapability("stores.walmart")
   const { data: stores } = useQuery({ ...storesQuery, enabled: kroger })
+  /**
+   * The store a list is for: the one it's set to, else the one it's named
+   * for ("Walmart", or "Fry's" for the household's Kroger store).
+   */
+  const storeOf = (one: { name: string; store: string | null } | undefined) => {
+    if (!one) return null
+    const banner = stores?.kroger.location?.banner
+    return (
+      one.store ??
+      storeNamed(
+        one.name,
+        household?.country,
+        banner ? [{ key: "kroger", name: banner }] : []
+      )
+    )
+  }
   /** Where to find something on its list's store's site, if it has one. */
   const findAt = (item: ListItem) => {
-    const store = lists.find((option) => option.id === item.list)?.store
+    const store = storeOf(lists.find((option) => option.id === item.list))
     const url = storeSearch(store, household?.country, item.name)
     return store && url
       ? { store: STORES_BY_KEY.get(store)?.name ?? store, url }
@@ -172,22 +188,21 @@ export function ListPage() {
   useSelectionKeepOnly(selection, selectable)
   const picked = selectable.filter((id) => selection.isPicked(id))
   const elsewhere = lists.filter((option) => option.id !== current?.id)
-  // The household's Kroger store (Fry's, Ralphs...) takes the Kroger list,
-  // or without one, the lists for no store in particular.
+  // Sending is for the list showing, and only what's on it: to the
+  // household's Kroger store (Fry's, Ralphs...) and to Walmart through the
+  // extension (experimental, when the server has it on, on walmart.com),
+  // from a list for that store or for no store in particular.
+  const showingStore = storeOf(current)
   const krogerStore = stores?.kroger.location?.banner
   const toKroger =
     krogerStore &&
     toGet.length > 0 &&
-    (current?.store === "kroger" ||
-      (!lists.some((option) => option.store === "kroger") && !current?.store))
-  // Walmart through the extension (experimental, when the server has it on),
-  // on walmart.com: the Walmart list, or the lists for no store in particular.
+    (showingStore === "kroger" || showingStore === null)
   const toWalmart =
     walmart &&
     toGet.length > 0 &&
     (household?.country ?? "US") === "US" &&
-    (current?.store === "walmart" ||
-      (!lists.some((option) => option.store === "walmart") && !current?.store))
+    (showingStore === "walmart" || showingStore === null)
   /** The list showing, when there's more than one. */
   const listShowing = split ? current?.id : undefined
 
@@ -229,7 +244,12 @@ export function ListPage() {
           ) : (
             <>
               {toKroger && (
-                <Button variant="outline" render={<Link to="/list/kroger" />}>
+                <Button
+                  variant="outline"
+                  render={
+                    <Link to="/list/kroger" search={{ list: current?.id }} />
+                  }
+                >
                   <HugeiconsIcon
                     icon={ShoppingCart01Icon}
                     strokeWidth={2}
@@ -239,7 +259,12 @@ export function ListPage() {
                 </Button>
               )}
               {toWalmart && (
-                <Button variant="outline" render={<Link to="/list/walmart" />}>
+                <Button
+                  variant="outline"
+                  render={
+                    <Link to="/list/walmart" search={{ list: current?.id }} />
+                  }
+                >
                   <HugeiconsIcon
                     icon={ShoppingCart01Icon}
                     strokeWidth={2}

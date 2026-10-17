@@ -73,17 +73,40 @@ function amountOf(item: ShoppingItem) {
   return item.amountText ?? formatAmount(quantity, item.unit ?? null)
 }
 
-/** What's left to get on the list for a store: its own, else those for no store. */
-export async function itemsToGet(em: EntityManager, store: string = KROGER) {
-  const lists = await em.find(ShoppingList, {})
-  const forStore = lists.filter((list) => list.store === store)
-  const chosen =
-    forStore.length > 0 ? forStore : lists.filter((list) => !list.store)
+/**
+ * What's left to get for a store: on one list, the one the person's
+ * looking at (`listId`); without one, the store's own list, else the lists
+ * for no store.
+ */
+export async function itemsToGet(
+  em: EntityManager,
+  store: string = KROGER,
+  listId?: string
+) {
+  let chosen: string[]
+  if (listId) {
+    const list = await em.findOne(ShoppingList, { id: listId })
+    if (!list) {
+      throw new AppError("not_found", "list_not_found", "There's no such list.")
+    }
+    chosen = [list.id]
+  } else {
+    const lists = await em.find(ShoppingList, {})
+    const forStore = lists.filter((list) => list.store === store)
+    chosen = (
+      forStore.length > 0 ? forStore : lists.filter((list) => !list.store)
+    ).map((list) => list.id)
+  }
   return em.find(
     ShoppingItem,
-    { list: { $in: chosen.map((list) => list.id) }, checked: false },
+    { list: { $in: chosen }, checked: false },
     { orderBy: { createdAt: "asc", id: "asc" } }
   )
+}
+
+/** Everything left to get, on every list: what was sent is remembered while it's here. */
+export async function itemsLeft(em: EntityManager) {
+  return em.find(ShoppingItem, { checked: false }, { fields: ["id"] })
 }
 
 /** Keeps the prices seen today, the latest of the day winning. */
@@ -271,10 +294,11 @@ export function lineFor(
 export async function krogerBasket(
   deps: BasketDeps,
   em: EntityManager,
-  who: { householdId: string; userId: string | null }
+  who: { householdId: string; userId: string | null },
+  listId?: string
 ) {
   const { app, connection, location } = await ready(deps, em)
-  const items = await itemsToGet(em)
+  const items = await itemsToGet(em, KROGER, listId)
   const foods = [...new Set(items.map(foodOf))]
   const kept = new Map(
     (await em.find(StoreProduct, { store: KROGER, food: { $in: foods } })).map(
@@ -455,7 +479,7 @@ export async function sendKrogerBasket(
     }))
   )
   // Remember what went, while it's still on the list.
-  const stillOn = new Set((await itemsToGet(em)).map((item) => item.id))
+  const stillOn = new Set((await itemsLeft(em)).map((item) => item.id))
   connection.lastSent = {
     at: new Date().toISOString(),
     items: {

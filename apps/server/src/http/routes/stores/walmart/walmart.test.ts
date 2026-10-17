@@ -209,6 +209,49 @@ describe("Walmart", () => {
     )
   })
 
+  test("sends just the list being looked at, when it's asked for", async () => {
+    const { lists } = (await (await kyle.get("/api/list")).json()) as {
+      lists: { id: string; name: string }[]
+    }
+    // Named for the store, but not set to it: a list for no store.
+    const saved = await kyle.put("/api/list/lists", {
+      lists: [
+        { id: lists[0]!.id, name: lists[0]!.name, store: null, aisles: [] },
+        { name: "Walmart", store: null, aisles: [] },
+      ],
+    })
+    expect(saved.status, await saved.clone().text()).toBe(200)
+    const walmartList = (
+      (await saved.json()) as { lists: { id: string; name: string }[] }
+    ).lists.find((one) => one.name === "Walmart")!
+    await kyle.post("/api/list/items", {
+      text: "paper towels",
+      list: walmartList.id,
+    })
+
+    // Without a list: every list for no store, both of them.
+    const names = (await basket()).lines.map((one) => one.name)
+    expect(names.some((name) => /paper towel/.test(name))).toBe(true)
+    expect(names.some((name) => /milk/.test(name))).toBe(true)
+
+    // The list being looked at: just its own.
+    const res = await kyle.get(
+      `/api/stores/walmart/basket?list=${walmartList.id}`
+    )
+    expect(res.status, await res.clone().text()).toBe(200)
+    const one = (await res.json()) as Awaited<ReturnType<typeof basket>>
+    expect(one.lines).toHaveLength(1)
+    expect(one.lines[0]!.name).toMatch(/paper towel/)
+    expect(one.toFind.map((thing) => thing.words)).toHaveLength(1)
+
+    const none = await kyle.get(
+      "/api/stores/walmart/basket?list=0199e8b0-5a10-7a01-8b00-000000000000"
+    )
+    expect(none.status).toBe(404)
+    const nonsense = await kyle.get("/api/stores/walmart/basket?list=nope")
+    expect(nonsense.status).toBe(400)
+  })
+
   test("takes only Walmart's own pages from the extension", async () => {
     const { lines } = await basket()
     const res = await kyle.put(

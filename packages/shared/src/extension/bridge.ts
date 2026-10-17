@@ -86,13 +86,21 @@ export type ExtensionCalls = {
   status: { args: object; answer: ExtensionStatus }
   /** Opens the extension's page asking to work on walmart.com. */
   "walmart-access": { args: object; answer: Answer }
-  /** Finds everything without a product at Walmart, in the Walmart tab. */
-  "walmart-find": { args: { householdId: string }; answer: Answer }
+  /**
+   * Finds everything without a product at Walmart, in the Walmart tab: on
+   * the list the person's looking at, if it's given.
+   */
+  "walmart-find": {
+    args: { householdId: string; list?: string }
+    answer: Answer
+  }
   /** Fills the Walmart cart with these lines, one product at a time. */
   "walmart-fill": {
     args: {
       householdId: string
       lines: { itemId: string; packages: number }[]
+      /** The list they're on. */
+      list?: string
     }
     answer: Answer
   }

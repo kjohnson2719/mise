@@ -13,6 +13,7 @@ import { householdToday } from "../pantry/pantry.ts"
 import {
   choose,
   foodOf,
+  itemsLeft,
   itemsToGet,
   lineFor,
   recordPrices,
@@ -66,11 +67,12 @@ async function keptFor(em: EntityManager, foods: readonly string[]) {
 export async function walmartBasket(
   deps: StoreDeps,
   em: EntityManager,
-  householdId: string
+  householdId: string,
+  listId?: string
 ) {
   await needWalmart(deps)
   const connection = await connectionOf(em, householdId, WALMART)
-  const items = await itemsToGet(em, WALMART)
+  const items = await itemsToGet(em, WALMART, listId)
   const kept = await keptFor(em, [...new Set(items.map(foodOf))])
   await em.flush()
   const sales = await judgeSales(
@@ -270,9 +272,7 @@ export async function walmartSent(
     sent[line.itemId] = line.packages
   }
   const connection = await connectionOf(em, householdId, WALMART)
-  const stillOn = new Set(
-    (await itemsToGet(em, WALMART)).map((item) => item.id)
-  )
+  const stillOn = new Set((await itemsLeft(em)).map((item) => item.id))
   connection.lastSent = {
     at: new Date().toISOString(),
     items: {

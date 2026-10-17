@@ -132,7 +132,7 @@ Keep this page current: when a feature is built, changed, planned or dropped, up
 | A shopping list from the plan: combined, converted, pantry taken off | Headline | Built | One line per food however recipes name it (plain flour is all-purpose flour, chopped parsley is parsley, lemon wedges are lemons) and measure it (a head of garlic is ten cloves, a stick of butter half a cup, a cup of flour 120 g); names without how it's used or prepped ("to serve", "or vegetable oil", "large" on vegetables); a line naming more than one food is each of them ("salt and pepper", "½ tsp each thyme and oregano") |
 | Every-week items and always-on-hand staples | Key | Built | |
 | Sorted by aisle, and it remembers where things go | Key | Built | |
-| A list for each place you shop | Key | Built | |
+| A list for each place you shop | Key | Built | A list named for a store is that store's (Walmart, Costco, or Fry's for the household's Kroger store): its things can be found on the store's site, and Send to sends just that list |
 | Shopping together: the list updates live on every phone | Headline | Built | |
 | Usual buys: "Milk? You last got some Oct 9" | Key | Built | |
 | A pantry: amounts, use soon, leftovers, cooking uses it up | Headline | Built | |

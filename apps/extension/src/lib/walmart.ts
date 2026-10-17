@@ -601,9 +601,12 @@ function fillsFor(
   return { fills: [...fills.values()], skipped }
 }
 
-const basketOf = (connection: Connection) =>
+/** The cart as Merran has it: for one list, the one the person's looking at, if it's given. */
+const basketOf = (connection: Connection, list: string | undefined) =>
   unwrap(
-    apiFor(connection).GET("/api/stores/walmart/basket"),
+    apiFor(connection).GET("/api/stores/walmart/basket", {
+      params: { query: list ? { list } : {} },
+    }),
     connection.origin
   )
 
@@ -623,11 +626,13 @@ export async function answerPage<C extends ExtensionCommand>(
   if (!all.some((one) => one.origin === origin)) {
     return command === "status" ? statusFor(origin) : no("household")
   }
-  const { householdId, lines, words } = args as {
+  const { householdId, lines, words, list } = args as {
     householdId?: string
     lines?: { itemId: string; packages: number }[]
     words?: string
+    list?: unknown
   }
+  const listId = typeof list === "string" && list ? list : undefined
   const connection =
     typeof householdId === "string"
       ? await connectionFor(origin, householdId)
@@ -653,7 +658,7 @@ export async function answerPage<C extends ExtensionCommand>(
       const cant = await claim()
       if (cant) return cant
       try {
-        const basket = await basketOf(connection)
+        const basket = await basketOf(connection, listId)
         const job = newJob(origin, connection.householdId, beside, merranTab, {
           kind: "find",
           todo: basket.toFind,
@@ -673,7 +678,7 @@ export async function answerPage<C extends ExtensionCommand>(
       if (cant) return cant
       try {
         const { fills, skipped } = fillsFor(
-          await basketOf(connection),
+          await basketOf(connection, listId),
           lines
             .filter(
               (line) =>

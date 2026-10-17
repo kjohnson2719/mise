@@ -36,6 +36,7 @@ import { BasketLineRow } from "./basket-line"
 import { ProductSearchDialog } from "./product-search-dialog"
 import {
   formatPrice,
+  useListName,
   walmartBasketQuery,
   type BasketLine,
   type StoreProduct,
@@ -52,9 +53,9 @@ type WalmartBasket = Schemas["WalmartBasket"]
  * stops, and this page asks the person to finish it in the tab and carry
  * on. Checking out is always theirs, on Walmart's site.
  */
-export function WalmartBasketPage() {
+export function WalmartBasketPage({ list }: { list?: string }) {
   const { t } = useTranslation()
-  const basket = useQuery(walmartBasketQuery)
+  const basket = useQuery(walmartBasketQuery(list))
 
   return (
     <>
@@ -68,7 +69,7 @@ export function WalmartBasketPage() {
         {t("nav.list")}
       </Button>
       {basket.data ? (
-        <Walmart basket={basket.data} />
+        <Walmart basket={basket.data} list={list} />
       ) : basket.isPending ? (
         <>
           <PageHeader title={t("stores.walmart.title")} />
@@ -106,8 +107,16 @@ function useSaidNo() {
       : (answer.message ?? t(`stores.walmart.no.${answer.why}`))
 }
 
-function Walmart({ basket }: { basket: WalmartBasket }) {
+function Walmart({
+  basket,
+  list,
+}: {
+  basket: WalmartBasket
+  /** The list the person's looking at, which is all that's sent. */
+  list?: string
+}) {
   const { t, i18n } = useTranslation()
+  const listName = useListName(list)
   const queryClient = useQueryClient()
   const { today } = useHouseholdClock()
   const household = useActiveHousehold()
@@ -129,7 +138,7 @@ function Walmart({ basket }: { basket: WalmartBasket }) {
   React.useEffect(() => {
     if (moved) {
       void queryClient.invalidateQueries({
-        queryKey: walmartBasketQuery.queryKey,
+        queryKey: walmartBasketQuery(list).queryKey,
       })
     }
   }, [moved, queryClient])
@@ -177,7 +186,11 @@ function Walmart({ basket }: { basket: WalmartBasket }) {
   }
 
   const find = () =>
-    household && void ask("walmart-find", { householdId: household.id })
+    household &&
+    void ask("walmart-find", {
+      householdId: household.id,
+      ...(list ? { list } : {}),
+    })
 
   const fill = () =>
     household &&
@@ -187,6 +200,7 @@ function Walmart({ basket }: { basket: WalmartBasket }) {
         itemId: line.itemId,
         packages: packagesOf(line),
       })),
+      ...(list ? { list } : {}),
     })
 
   /** Walmart's search, in the person's Walmart tab, for picking by hand. */
@@ -231,7 +245,7 @@ function Walmart({ basket }: { basket: WalmartBasket }) {
     )
 
   function picked(line: BasketLine) {
-    queryClient.setQueryData(walmartBasketQuery.queryKey, (was) =>
+    queryClient.setQueryData(walmartBasketQuery(list).queryKey, (was) =>
       was
         ? {
             ...was,
@@ -249,7 +263,11 @@ function Walmart({ basket }: { basket: WalmartBasket }) {
     <>
       <PageHeader
         title={t("stores.walmart.title")}
-        description={t("stores.walmart.description")}
+        description={
+          listName
+            ? t("stores.walmart.descriptionFor", { list: listName })
+            : t("stores.walmart.description")
+        }
         actions={
           <Button
             disabled={

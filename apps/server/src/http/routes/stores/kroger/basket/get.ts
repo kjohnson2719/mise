@@ -8,7 +8,7 @@ import {
   jsonResponse,
   SIGNED_IN_ERRORS,
 } from "../../../../schemas/responses.ts"
-import { BasketSchema } from "../../../../schemas/stores.ts"
+import { BasketQuery, BasketSchema } from "../../../../schemas/stores.ts"
 
 const route = createRoute({
   method: "get",
@@ -17,10 +17,12 @@ const route = createRoute({
   tags: ["Stores"],
   summary: "The Kroger cart to look over",
   description:
-    "Each thing left on the list for Kroger (or, with no list for it, the lists for any store) with its product: the one the household picked before, at today's price, or Merran's pick from the store's search, made by the household's model for shopping when it has AI. How many packages, worked out from the product's size where it can be. Nothing is sent until `POST /stores/kroger/send`.",
+    "Each thing left on a list (the one asked for, the one the person's looking at; or without one the list for Kroger, else the lists for any store) with its product: the one the household picked before, at today's price, or Merran's pick from the store's search, made by the household's model for shopping when it has AI. How many packages, worked out from the product's size where it can be. Nothing is sent until `POST /stores/kroger/send`.",
   ...openToKeys("list", "write"),
+  request: { query: BasketQuery },
   responses: {
     200: jsonResponse(BasketSchema, "The cart to look over."),
+    404: errorResponse("There's no such list."),
     422: errorResponse("Kroger isn't set up, or the household has no store."),
     ...SIGNED_IN_ERRORS,
   },
@@ -29,6 +31,10 @@ const route = createRoute({
 export default (router: Router, deps: AppDeps) => {
   router.openapi(route, async (c) => {
     const { em, householdId, userId } = inHousehold(c)
-    return c.json(await krogerBasket(deps, em, { householdId, userId }), 200)
+    const { list } = c.req.valid("query")
+    return c.json(
+      await krogerBasket(deps, em, { householdId, userId }, list),
+      200
+    )
   })
 }

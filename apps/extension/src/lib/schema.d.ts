@@ -3321,7 +3321,7 @@ export interface paths {
         };
         /**
          * The Kroger cart to look over
-         * @description Each thing left on the list for Kroger (or, with no list for it, the lists for any store) with its product: the one the household picked before, at today's price, or Merran's pick from the store's search, made by the household's model for shopping when it has AI. How many packages, worked out from the product's size where it can be. Nothing is sent until `POST /stores/kroger/send`. With an API key, it needs the `list: write` permission.
+         * @description Each thing left on a list (the one asked for, the one the person's looking at; or without one the list for Kroger, else the lists for any store) with its product: the one the household picked before, at today's price, or Merran's pick from the store's search, made by the household's model for shopping when it has AI. How many packages, worked out from the product's size where it can be. Nothing is sent until `POST /stores/kroger/send`. With an API key, it needs the `list: write` permission.
          */
         get: operations["getKrogerBasket"];
         put?: never;
@@ -3421,7 +3421,7 @@ export interface paths {
         };
         /**
          * The Walmart cart to look over
-         * @description Experimental, when the server admin has turned Walmart on. Each thing left on the list for Walmart (or, with no list for it, the lists for any store) with its product, the household's own pick or Merran's, how many and what it cost when last seen; and what's still to find at Walmart, which Merran's browser extension looks for in the person's own Walmart tab. Merran never reaches Walmart itself. With an API key, it needs the `list: read` permission.
+         * @description Experimental, when the server admin has turned Walmart on. Each thing left on a list (the one asked for, the one the person's looking at; or without one the list for Walmart, else the lists for any store) with its product, the household's own pick or Merran's, how many and what it cost when last seen; and what's still to find at Walmart, which Merran's browser extension looks for in the person's own Walmart tab. Merran never reaches Walmart itself. With an API key, it needs the `list: read` permission.
          */
         get: operations["getWalmartBasket"];
         put?: never;
@@ -20343,7 +20343,10 @@ export interface operations {
     };
     getKrogerBasket: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Just this list, the one the person's looking at. Without it, the store's own list, else the lists for no store in particular. */
+                list?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -20370,6 +20373,15 @@ export interface operations {
             };
             /** @description Not allowed. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There's no such list. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -20617,7 +20629,10 @@ export interface operations {
     };
     getWalmartBasket: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Just this list, the one the person's looking at. Without it, the store's own list, else the lists for no store in particular. */
+                list?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -20644,6 +20659,15 @@ export interface operations {
             };
             /** @description Not allowed. */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There's no such list. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
