@@ -117,7 +117,9 @@ The repo: `apps/server` (Hono, MikroORM, the jobs), `apps/web` (React, TanStack 
 
 ### Releases
 
-CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs every check on each push and pull request, and publishes `edge` from main. A release is made by running **Release** in GitHub Actions on main with its version (`0.1.0-alpha.2`): it runs the checks again, builds and signs the images, zips the extension, and writes the GitHub release, tagged `v0.1.0-alpha.2`, with notes from the commits since the last one.
+CI ([.github/workflows/ci.yml](.github/workflows/ci.yml)) runs every check on each push and pull request, and publishes `edge` from main.
+
+A pull request's title starts with its kind: `feat:`, `fix:`, `docs:` or `chore:` (the rest are in [.github/release-drafter.yml](.github/release-drafter.yml)), with a `!` for a breaking change (`feat!: ...`). As pull requests merge, Release Drafter keeps a draft of the next release with each one under its heading. To release, write the highlights in that draft, then run **Release** in GitHub Actions on main with the version (`0.1.0-alpha.2`). It runs the checks again, builds and signs the images, zips the extension, and then publishes the draft, tagged `v0.1.0-alpha.2`.
 
 ## License
 

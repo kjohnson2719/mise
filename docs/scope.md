@@ -138,7 +138,7 @@ Each phase ends with something that runs and can be tried, on `edge` images. 0.1
 ### Phase 0: Foundation
 
 - The repo: pnpm workspace (`apps/server`, `apps/web`, `apps/extension`, `apps/docs`, `apps/telemetry`, `packages/shared`), with REFERENCE kept aside, read-only, until Merran had everything it did
-- CI with every check in [open-source.md](open-source.md#keeping-the-code-healthy), Renovate, release-please, and `edge` images published to GHCR
+- CI with every check in [open-source.md](open-source.md#keeping-the-code-healthy), Renovate, release notes drafted by Release Drafter, and `edge` images published to GHCR
 - The settings schema and the module registry, with `GET /api/capabilities`
 - Hono with OpenAPI routes, the generated client, `/api/docs`
 - MikroORM entities with migrations generated for SQLite and Postgres, every test on both, and `merran db copy`; the job runner; the storage interface; the one fetch helper; the internal event stream

@@ -18,14 +18,14 @@ What it takes to run Merran as a public project: the name and license, how peopl
 | File | What it covers |
 |---|---|
 | `README.md` | What Merran is, screenshots, a two-minute install, links to the docs |
-| `CONTRIBUTING.md` | Setting up, the commands, how to send a change, commit messages, the DCO |
+| `CONTRIBUTING.md` | Setting up, the commands, how to send a change, pull request titles (`feat:`, `fix:`...), the DCO |
 | `CODE_OF_CONDUCT.md` | Contributor Covenant |
 | `SECURITY.md` | How to report a vulnerability privately, and what happens next |
 | `SUPPORT.md` | Where to ask questions (Discussions), and what issues are for |
 | `GOVERNANCE.md` | Who decides: the maintainer for now, and how that could change |
 | `PRIVACY.md` | What Merran sends where (from [operations.md](operations.md#what-leaves-the-server)) |
 | `TRADEMARK.md` | Using the name and logo |
-| `CHANGELOG.md` | Written by release-please |
+| `CHANGELOG.md` | A pointer to the GitHub releases, whose notes Release Drafter drafts (see [operations.md](operations.md#releases-and-updates)) |
 | `.github/` | Issue forms (bug with diagnostics, store request, importer request), a pull request template, `CODEOWNERS`, `FUNDING.yml`, Renovate and workflow files |
 
 - **Issues are for bugs; ideas go to Discussions,** with a template that asks what problem it solves. Popular ideas move to the public roadmap.
@@ -99,7 +99,7 @@ The repo's `docs/` keeps the decision records (like this plan). The docs site is
 | **AI** | Getting keys, whose key pays and monthly limits, what things cost, which local models work | Written, from [platform.md](platform.md#ai) |
 | **API and integrations** | Below | Mostly generated |
 | **Contribute** | Architecture; the conventions (route folders, one route per file); adding a store, importer, AI provider or language; the DCO | Written |
-| **Reference** | The glossary, the changelog, the threat model, privacy | The glossary from the ⓘ explanations (see [platform.md](platform.md#help-and-guided-tours)); the changelog from release-please |
+| **Reference** | The glossary, the changelog, the threat model, privacy | The glossary from the ⓘ explanations (see [platform.md](platform.md#help-and-guided-tours)); the changelog from the GitHub releases |
 
 ### The API section
 

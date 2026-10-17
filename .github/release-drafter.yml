@@ -1,0 +1,83 @@
+# The next release's notes (docs/operations.md, "Releases and updates"):
+# Release Drafter keeps a draft release up to date as pull requests merge
+# into main, sorted by the type at the start of each title (feat: ..., fix:
+# ...). Before running Release, write the highlights in the draft on GitHub;
+# Release then publishes it, once the images are built.
+#
+# Check PR (.github/workflows/pull-request.yml) holds each pull request's
+# title to these categories, so every change lands in one.
+
+name-template: "Merran $RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+
+# Pre-releases until 0.1.0: each draft is the next alpha, with what's merged
+# since the last one. Take this out for 0.1.0.
+prerelease-identifier: alpha
+
+categories:
+  # A ! after the type: feat!: ... Minor while Merran is 0.x; major from 1.0.
+  - title: "🚨 Breaking changes"
+    exclusive: true
+    semver-increment: minor
+    when:
+      conventional:
+        breaking: true
+  - title: "✨ New features"
+    semver-increment: minor
+    when:
+      conventional:
+        type: feat
+  - title: "🐛 Bug fixes"
+    when:
+      conventional:
+        types: [fix, revert]
+  - title: "📚 Documentation"
+    when:
+      conventional:
+        type: docs
+  # chore(deps): ..., before Maintenance so they're only listed once.
+  - title: "⬆️ Dependency updates"
+    exclusive: true
+    collapse-after: 3
+    when:
+      conventional:
+        scope: deps
+  - title: "🧰 Maintenance"
+    collapse-after: 3
+    when:
+      conventional:
+        types: [chore, refactor, perf, test, build, ci, style]
+  # Pull requests from before titles had a type.
+  - title: "📦 Other changes"
+  - type: pre-exclude
+    when:
+      label: skip-changelog
+
+change-template: "- $TITLE $AUTHORS (#$NUMBER)"
+change-title-escapes: '\<*_&'
+sort-direction: ascending
+
+# The headings say what kind each change is, so the titles lose their type:
+# "feat: on-sale badges" is listed as "On-sale badges".
+replacers:
+  - search: '/^- \w+(\([^)]*\))?!?: /gm'
+    replace: "- "
+  - search: "/^- ([a-z])/gm"
+    replace: '- \u$1'
+
+new-contributor-template: "- $AUTHOR_MENTION made their first contribution in #$NUMBER"
+no-new-contributor-template: "No one new this time."
+
+# Release looks for this line, and won't publish a draft that still has it.
+# The first release's draft has nothing to compare with, so it says "No
+# changes" with a warning from Release Drafter: write its notes by hand.
+template: |
+  ## 🎉 Highlights
+
+  _Write the highlights here: what's new and worth a look, with screenshots. Or delete this section._
+
+  $CHANGES
+
+  ## 🙏 New contributors
+
+  $NEW_CONTRIBUTORS

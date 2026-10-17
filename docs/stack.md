@@ -49,7 +49,7 @@ Versions are what's current in October 2026. Pin exact versions in the lockfile 
 | Tests | Vitest on PGlite | Vitest on SQLite in memory and on Postgres, MSW, and Playwright | Keep Vitest, add more |
 | Lint and format | ESLint + Prettier | ESLint + Prettier, plus knip | Keep |
 | Docs site | None | **Starlight** (Astro) | New |
-| CI and releases | GitHub Actions; compose builds from the repo | GitHub Actions, release-please, images on GHCR | Change |
+| CI and releases | GitHub Actions; compose builds from the repo | GitHub Actions, Release Drafter, images on GHCR | Change |
 
 ## What changes, and why
 
