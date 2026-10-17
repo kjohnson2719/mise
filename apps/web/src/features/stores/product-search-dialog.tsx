@@ -79,18 +79,25 @@ export function ProductSearchDialog({
   const [found, setFound] = React.useState<StoreProduct[] | null>(null)
   const [busy, setBusy] = React.useState<string | null>(null)
 
-  // A fresh search for each thing, or what the store had for it.
+  // A fresh search for each thing, or what the store had for it, looking
+  // (the spinner) from the moment it opens. Only the latest opening goes
+  // on: React opens it twice while developing.
   React.useEffect(() => {
     if (!line) return
+    let live = true
     setTerm(line.name)
     setFound(null)
-    if (start) void begin(line, start)
+    if (start) void begin(line, start, () => live)
     else void search(line.name)
+    return () => {
+      live = false
+    }
   }, [line?.itemId])
 
   async function begin(
     line: PickFor,
-    start: (line: PickFor) => Promise<StoreProduct[]>
+    start: (line: PickFor) => Promise<StoreProduct[]>,
+    live: () => boolean
   ) {
     setBusy("search")
     let products: StoreProduct[] = []
@@ -100,23 +107,46 @@ export function ProductSearchDialog({
       if (!(err instanceof ApiError)) throw err
       toast.error(err.message)
     }
-    setBusy(null)
-    // Nothing kept for it: look now.
-    if (products.length > 0) setFound(products)
-    else await search(line.name)
+    if (!live()) return
+    if (products.length > 0) {
+      setFound(products)
+      setBusy(null)
+      return
+    }
+    // Nothing kept for it: look now, still looking.
+    await search(line.name)
   }
 
+  // The search going now, so the same words aren't searched twice at once:
+  // React runs the opening search twice while developing, and Walmart's
+  // search in the person's tab can only do one at a time.
+  const searching = React.useRef<{ words: string; done: Promise<void> } | null>(
+    null
+  )
+
   async function search(q: string) {
-    if (q.trim().length < 2) return
-    setBusy("search")
+    const words = q.trim()
+    if (words.length < 2) return
+    if (searching.current?.words === words) return searching.current.done
+    const done = (async () => {
+      setBusy("search")
+      try {
+        const products = await searchStore(words)
+        if (products) setFound(products)
+      } catch (err) {
+        if (!(err instanceof ApiError || err instanceof ExtensionError)) {
+          throw err
+        }
+        toast.error(err.message)
+      } finally {
+        setBusy(null)
+      }
+    })()
+    searching.current = { words, done }
     try {
-      const products = await searchStore(q.trim())
-      if (products) setFound(products)
-    } catch (err) {
-      if (!(err instanceof ApiError || err instanceof ExtensionError)) throw err
-      toast.error(err.message)
+      await done
     } finally {
-      setBusy(null)
+      if (searching.current?.done === done) searching.current = null
     }
   }
 

@@ -1871,7 +1871,7 @@
         "check": "Walmart wants to check you're a person. Finish that in the Walmart tab, then carry on.",
         "failed": "That didn't work. Try again.",
         "searchCheck": "Walmart wants to check you're a person. Finish that in the Walmart tab, then search again.",
-        "searchSetup": "Searching Walmart needs Merran's browser extension: set it up above, then search again."
+        "searchSetup": "Searching Walmart needs Merran's browser extension, in this browser and connected to this household. Send, then Review Walmart, walks through setting it up."
       },
       "job": {
         "starting": "Opening Walmart…",

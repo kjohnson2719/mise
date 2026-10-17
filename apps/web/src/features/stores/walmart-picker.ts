@@ -39,11 +39,27 @@ export function useWalmartPicker() {
     status?.households.some((one) => one.id === household?.id) ?? false
   const ready = connected && status?.walmart.access === true
 
+  /**
+   * Why the extension can't search now, if it can't: asked afresh, as a
+   * picker can search the moment it opens, before this page has heard
+   * from the extension at all.
+   */
+  async function cantSearch(householdId: string) {
+    const now = await callExtension("status", {}, 2000)
+    if (!now) return t("stores.walmart.no.searchSetup")
+    if (!now.households.some((one) => one.id === householdId)) {
+      return t("stores.walmart.no.household")
+    }
+    if (!now.walmart.access) return t("stores.walmart.no.access")
+    return null
+  }
+
   /** Walmart's search, in the person's Walmart tab, for picking by hand. */
   async function search(words: string): Promise<StoreProduct[] | null> {
     if (!household) return null
     // No extension to search with: say so now, not after waiting for it.
-    if (!ready) throw new ExtensionError(t("stores.walmart.no.searchSetup"))
+    const cant = await cantSearch(household.id)
+    if (cant) throw new ExtensionError(cant)
     const answer = await callExtension(
       "walmart-search",
       { householdId: household.id, words },
