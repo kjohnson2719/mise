@@ -21,6 +21,7 @@ import {
 } from "@/features/server/queries"
 import { TelemetryCard } from "@/features/server/telemetry-card"
 import { VideoCard } from "@/features/server/video-card"
+import { WalmartCard } from "@/features/server/walmart-card"
 
 export const Route = createFileRoute("/_app/settings/server")({
   beforeLoad: async ({ context }) => {
@@ -50,6 +51,7 @@ function ServerSettings() {
       <PhotosCard />
       <VoiceCard />
       <KrogerCard />
+      <WalmartCard />
       <ErrorTrackingCard />
       <TelemetryCard />
       <JobsCard />

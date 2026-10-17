@@ -13033,6 +13033,525 @@
           "deals": 3
         }
       },
+      "WalmartBasket": {
+        "type": "object",
+        "properties": {
+          "store": {
+            "type": "string",
+            "description": "Walmart."
+          },
+          "cartUrl": {
+            "type": "string",
+            "description": "Walmart's cart, to check out."
+          },
+          "sentAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BasketLine"
+            }
+          },
+          "toFind": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string"
+                },
+                "words": {
+                  "type": "string",
+                  "description": "What to search Walmart for: the food as it's bought."
+                }
+              },
+              "required": [
+                "itemId",
+                "words"
+              ]
+            },
+            "description": "Things without a product yet, one for each food, for the extension to look for at Walmart."
+          }
+        },
+        "required": [
+          "store",
+          "cartUrl",
+          "sentAt",
+          "lines",
+          "toFind"
+        ],
+        "example": {
+          "store": "Walmart",
+          "cartUrl": "https://www.walmart.com/cart",
+          "sentAt": null,
+          "lines": [
+            {
+              "itemId": "0199e8b0-5a10-7a01-8b00-00000000001d",
+              "name": "milk",
+              "amount": "1 gallon",
+              "product": {
+                "id": "10450114",
+                "upc": null,
+                "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+                "brand": "Great Value",
+                "size": "128 fl oz",
+                "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+                "price": 327,
+                "salePrice": null,
+                "saleEnds": null,
+                "currency": "USD",
+                "aisle": null,
+                "inStock": true,
+                "url": "https://www.walmart.com/ip/10450114"
+              },
+              "suggested": true,
+              "packages": 1,
+              "sure": true,
+              "sent": false,
+              "sale": null
+            },
+            {
+              "itemId": "0199e8b0-5a10-7a01-8b00-00000000001e",
+              "name": "eggs",
+              "amount": "12",
+              "product": null,
+              "suggested": true,
+              "packages": 1,
+              "sure": true,
+              "sent": false,
+              "sale": null
+            }
+          ],
+          "toFind": [
+            {
+              "itemId": "0199e8b0-5a10-7a01-8b00-00000000001e",
+              "words": "eggs"
+            }
+          ]
+        }
+      },
+      "WalmartFound": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string"
+                },
+                "products": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/WalmartProduct"
+                  },
+                  "maxItems": 12
+                }
+              },
+              "required": [
+                "itemId",
+                "products"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "example": {
+          "items": [
+            {
+              "itemId": "0199e8b0-5a10-7a01-8b00-00000000001e",
+              "products": [
+                {
+                  "id": "10450114",
+                  "upc": null,
+                  "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+                  "brand": "Great Value",
+                  "size": "128 fl oz",
+                  "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+                  "price": 327,
+                  "salePrice": null,
+                  "saleEnds": null,
+                  "currency": "USD",
+                  "aisle": null,
+                  "inStock": true,
+                  "url": "https://www.walmart.com/ip/10450114"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "WalmartProduct": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[0-9A-Za-z]{1,64}$"
+          },
+          "upc": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 20
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "brand": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 120
+          },
+          "size": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 60
+          },
+          "image": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "pattern": "^https:\\/\\/"
+          },
+          "price": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "salePrice": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000000
+          },
+          "saleEnds": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "Walmart's pages don't say, so the extension sends null."
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD"
+            ]
+          },
+          "aisle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 60
+          },
+          "inStock": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1000,
+            "pattern": "^https:\\/\\/www\\.walmart\\.com\\/"
+          }
+        },
+        "required": [
+          "id",
+          "upc",
+          "name",
+          "brand",
+          "size",
+          "image",
+          "price",
+          "salePrice",
+          "saleEnds",
+          "currency",
+          "aisle",
+          "inStock",
+          "url"
+        ],
+        "example": {
+          "id": "10450114",
+          "upc": null,
+          "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+          "brand": "Great Value",
+          "size": "128 fl oz",
+          "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+          "price": 327,
+          "salePrice": null,
+          "saleEnds": null,
+          "currency": "USD",
+          "aisle": null,
+          "inStock": true,
+          "url": "https://www.walmart.com/ip/10450114"
+        }
+      },
+      "WalmartOptions": {
+        "type": "object",
+        "properties": {
+          "products": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StoreProduct"
+            },
+            "description": "What Walmart's search had for it when the extension last looked, Walmart's order with ads and what's out of stock last. Empty if it hasn't looked."
+          }
+        },
+        "required": [
+          "products"
+        ],
+        "example": {
+          "products": [
+            {
+              "id": "10450114",
+              "upc": null,
+              "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+              "brand": "Great Value",
+              "size": "128 fl oz",
+              "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+              "price": 327,
+              "salePrice": null,
+              "saleEnds": null,
+              "currency": "USD",
+              "aisle": null,
+              "inStock": true,
+              "url": "https://www.walmart.com/ip/10450114"
+            }
+          ]
+        }
+      },
+      "WalmartPick": {
+        "type": "object",
+        "properties": {
+          "product": {
+            "$ref": "#/components/schemas/WalmartProduct"
+          }
+        },
+        "required": [
+          "product"
+        ],
+        "example": {
+          "product": {
+            "id": "10450114",
+            "upc": null,
+            "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+            "brand": "Great Value",
+            "size": "128 fl oz",
+            "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+            "price": 327,
+            "salePrice": null,
+            "saleEnds": null,
+            "currency": "USD",
+            "aisle": null,
+            "inStock": true,
+            "url": "https://www.walmart.com/ip/10450114"
+          }
+        }
+      },
+      "WalmartSent": {
+        "type": "object",
+        "properties": {
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "itemId": {
+                  "type": "string"
+                },
+                "packages": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 99
+                },
+                "product": {
+                  "type": [
+                    "object",
+                    "null"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[0-9A-Za-z]{1,64}$"
+                    },
+                    "upc": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 20
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 300
+                    },
+                    "brand": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 120
+                    },
+                    "size": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 60
+                    },
+                    "image": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 1000,
+                      "pattern": "^https:\\/\\/"
+                    },
+                    "price": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 10000000
+                    },
+                    "salePrice": {
+                      "type": [
+                        "integer",
+                        "null"
+                      ],
+                      "minimum": 0,
+                      "maximum": 10000000
+                    },
+                    "saleEnds": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "format": "date",
+                      "description": "Walmart's pages don't say, so the extension sends null."
+                    },
+                    "currency": {
+                      "type": "string",
+                      "enum": [
+                        "USD"
+                      ]
+                    },
+                    "aisle": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 60
+                    },
+                    "inStock": {
+                      "type": "boolean"
+                    },
+                    "url": {
+                      "type": [
+                        "string",
+                        "null"
+                      ],
+                      "maxLength": 1000,
+                      "pattern": "^https:\\/\\/www\\.walmart\\.com\\/"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "upc",
+                    "name",
+                    "brand",
+                    "size",
+                    "image",
+                    "price",
+                    "salePrice",
+                    "saleEnds",
+                    "currency",
+                    "aisle",
+                    "inStock",
+                    "url"
+                  ],
+                  "example": {
+                    "id": "10450114",
+                    "upc": null,
+                    "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+                    "brand": "Great Value",
+                    "size": "128 fl oz",
+                    "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+                    "price": 327,
+                    "salePrice": null,
+                    "saleEnds": null,
+                    "currency": "USD",
+                    "aisle": null,
+                    "inStock": true,
+                    "url": "https://www.walmart.com/ip/10450114"
+                  },
+                  "description": "The product as its page showed it when it was added."
+                }
+              },
+              "required": [
+                "itemId",
+                "packages"
+              ]
+            },
+            "minItems": 1,
+            "maxItems": 300
+          }
+        },
+        "required": [
+          "lines"
+        ],
+        "example": {
+          "lines": [
+            {
+              "itemId": "0199e8b0-5a10-7a01-8b00-00000000001d",
+              "packages": 1,
+              "product": {
+                "id": "10450114",
+                "upc": null,
+                "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+                "brand": "Great Value",
+                "size": "128 fl oz",
+                "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+                "price": 327,
+                "salePrice": null,
+                "saleEnds": null,
+                "currency": "USD",
+                "aisle": null,
+                "inStock": true,
+                "url": "https://www.walmart.com/ip/10450114"
+              }
+            }
+          ]
+        }
+      },
       "TelemetryReport": {
         "type": "object",
         "properties": {
@@ -27434,6 +27953,381 @@
           },
           "502": {
             "description": "Kroger didn't answer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stores/walmart/basket": {
+      "get": {
+        "operationId": "getWalmartBasket",
+        "tags": [
+          "Stores"
+        ],
+        "summary": "The Walmart cart to look over",
+        "description": "Experimental, when the server admin has turned Walmart on. Each thing left on the list for Walmart (or, with no list for it, the lists for any store) with its product, the household's own pick or Merran's, how many and what it cost when last seen; and what's still to find at Walmart, which Merran's browser extension looks for in the person's own Walmart tab. Merran never reaches Walmart itself. With an API key, it needs the `list: read` permission.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-merran-permission": "list:read",
+        "responses": {
+          "200": {
+            "description": "The cart to look over.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalmartBasket"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Walmart isn't turned on on this server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stores/walmart/found": {
+      "post": {
+        "operationId": "walmartFound",
+        "tags": [
+          "Stores"
+        ],
+        "summary": "What the extension found at Walmart",
+        "description": "The products Merran's browser extension read from Walmart's search for things on the list. Every price is kept; each thing without a product of the household's own gets Merran's pick (the household's model for shopping when it has AI, else the first in stock), kept for its food. A product someone picked is never replaced, only brought up to date. The answer is the cart to look over. With an API key, it needs the `list: write` permission.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-merran-permission": "list:write",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalmartFound"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Picked, and the cart as it is.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalmartBasket"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Walmart isn't turned on on this server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stores/walmart/products/{itemId}": {
+      "get": {
+        "operationId": "walmartOptions",
+        "tags": [
+          "Stores"
+        ],
+        "summary": "What Walmart had for a thing on the list",
+        "description": "The products Walmart's search had for its food when Merran's browser extension last looked, to pick another from without looking again. Empty if it hasn't looked yet. With an API key, it needs the `list: read` permission.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-merran-permission": "list:read",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "0199e8b0-5a10-7a01-8b00-00000000001d"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What Walmart had.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalmartOptions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not on the list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Walmart isn't turned on on this server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "pickWalmartProduct",
+        "tags": [
+          "Stores"
+        ],
+        "summary": "Buy this at Walmart for a thing on the list",
+        "description": "A product someone picked from Walmart, as the extension read it: kept for the thing's food from now on, and never replaced by Merran's picks. With an API key, it needs the `list: write` permission.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-merran-permission": "list:write",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "0199e8b0-5a10-7a01-8b00-00000000001d"
+            },
+            "required": true,
+            "name": "itemId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalmartPick"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Kept, and the line as it is.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BasketLine"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not on the list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Walmart isn't turned on on this server.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stores/walmart/sent": {
+      "post": {
+        "operationId": "walmartSent",
+        "tags": [
+          "Stores"
+        ],
+        "summary": "What the extension put in the Walmart cart",
+        "description": "Remembered as sent while it's still on the list, so it's left unticked next time, and its product kept as the household's, as its page showed it. The extension adds to the cart in the person's own Walmart tab; this only records it. With an API key, it needs the `list: write` permission.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "x-merran-permission": "list:write",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WalmartSent"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Remembered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SentBasket"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Walmart isn't turned on on this server.",
             "content": {
               "application/json": {
                 "schema": {

@@ -18,14 +18,35 @@ import {
   InputGroupInput,
 } from "@/components/ui/input-group"
 import { Spinner } from "@/components/ui/spinner"
+import { ExtensionError } from "@/features/extension/bridge"
 import { api, ApiError, unwrap } from "@/lib/api/client"
 
 import { ProductSummary } from "./product-summary"
 import type { BasketLine, StoreProduct } from "./queries"
 
+/** Kroger's search and pick, through Merran's server. */
+const KROGER = {
+  search: async (q: string) =>
+    (
+      await unwrap(
+        api.GET("/api/stores/kroger/search", { params: { query: { q } } })
+      )
+    ).products,
+  pick: (line: BasketLine, product: StoreProduct) =>
+    unwrap(
+      api.PUT("/api/stores/kroger/products/{itemId}", {
+        params: { path: { itemId: line.itemId } },
+        body: { productId: product.id },
+      })
+    ),
+}
+
 /**
  * Picks another product for a thing on the list: a search of the store,
- * and the pick is kept for next time.
+ * and the pick is kept for next time. Kroger's unless the store's own
+ * search and pick are given: Walmart's go through the browser extension,
+ * and it opens on what Walmart had (`start`) rather than searching again.
+ * A search that answers null has said why itself.
  */
 export function ProductSearchDialog({
   line,
@@ -33,38 +54,63 @@ export function ProductSearchDialog({
   today,
   onOpenChange,
   onPicked,
+  search: searchStore = KROGER.search,
+  pick: pickAtStore = KROGER.pick,
+  start,
+  hint,
 }: {
   line: BasketLine | null
   store: string
   today: string
   onOpenChange: (open: boolean) => void
   onPicked: (line: BasketLine) => void
+  search?: (q: string) => Promise<StoreProduct[] | null>
+  pick?: (line: BasketLine, product: StoreProduct) => Promise<BasketLine>
+  /** What to offer as it opens, in place of searching for the thing. */
+  start?: (line: BasketLine) => Promise<StoreProduct[]>
+  /** Where it searches, when it's not Merran's server. */
+  hint?: string
 }) {
   const { t } = useTranslation()
   const [term, setTerm] = React.useState("")
   const [found, setFound] = React.useState<StoreProduct[] | null>(null)
   const [busy, setBusy] = React.useState<string | null>(null)
 
-  // A fresh search for each thing.
+  // A fresh search for each thing, or what the store had for it.
   React.useEffect(() => {
     if (!line) return
     setTerm(line.name)
     setFound(null)
-    void search(line.name)
+    if (start) void begin(line, start)
+    else void search(line.name)
   }, [line?.itemId])
+
+  async function begin(
+    line: BasketLine,
+    start: (line: BasketLine) => Promise<StoreProduct[]>
+  ) {
+    setBusy("search")
+    let products: StoreProduct[] = []
+    try {
+      products = await start(line)
+    } catch (err) {
+      if (!(err instanceof ApiError)) throw err
+      toast.error(err.message)
+    }
+    setBusy(null)
+    // Nothing kept for it: look now.
+    if (products.length > 0) setFound(products)
+    else await search(line.name)
+  }
 
   async function search(q: string) {
     if (q.trim().length < 2) return
     setBusy("search")
     try {
-      const answer = await unwrap(
-        api.GET("/api/stores/kroger/search", {
-          params: { query: { q: q.trim() } },
-        })
-      )
-      setFound(answer.products)
+      const products = await searchStore(q.trim())
+      if (products) setFound(products)
     } catch (err) {
-      if (!(err instanceof ApiError)) throw err
+      if (!(err instanceof ApiError || err instanceof ExtensionError)) throw err
       toast.error(err.message)
     } finally {
       setBusy(null)
@@ -75,16 +121,10 @@ export function ProductSearchDialog({
     if (!line) return
     setBusy(product.id)
     try {
-      const picked = await unwrap(
-        api.PUT("/api/stores/kroger/products/{itemId}", {
-          params: { path: { itemId: line.itemId } },
-          body: { productId: product.id },
-        })
-      )
-      onPicked(picked)
+      onPicked(await pickAtStore(line, product))
       onOpenChange(false)
     } catch (err) {
-      if (!(err instanceof ApiError)) throw err
+      if (!(err instanceof ApiError || err instanceof ExtensionError)) throw err
       toast.error(err.message)
     } finally {
       setBusy(null)
@@ -99,7 +139,7 @@ export function ProductSearchDialog({
             {t("stores.basket.pickTitle", { name: line?.name })}
           </DialogTitle>
           <DialogDescription>
-            {t("stores.basket.pickHint", { store })}
+            {hint ?? t("stores.basket.pickHint", { store })}
           </DialogDescription>
         </DialogHeader>
         <form

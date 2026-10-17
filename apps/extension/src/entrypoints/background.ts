@@ -7,12 +7,15 @@ import {
   readTab,
   type Added,
 } from "@/lib/actions"
+import { syncBridge } from "@/lib/bridge"
 import { addConnection, apiFor, unwrap } from "@/lib/merran"
 import { listenForKey, showNote } from "@/lib/page"
+import { answerPage, watchWalmart } from "@/lib/walmart"
 
-// The extension's background: the right-click menu, and connecting to a
-// Merran. Browsers stop it when it's idle, so what it waits for is kept in
-// session storage.
+// The extension's background: the right-click menu, connecting to a
+// Merran, and what Merran's own pages ask through the bridge, such as
+// filling the Walmart cart. Browsers stop it when it's idle, so what it
+// waits for is kept in storage.
 
 /** Connect pages the extension opened, by tab, waiting for their key. */
 const connecting = {
@@ -90,7 +93,16 @@ async function connect(origin: string, key: string, keyId: string) {
 }
 
 export default defineBackground(() => {
+  // The bridge on each connected Merran's pages: registered again each
+  // time the background starts, and put on open tabs when that changes.
+  void syncBridge({ inject: false })
+  browser.storage.local.onChanged.addListener((changes) => {
+    if ("connections" in changes) void syncBridge({ inject: true })
+  })
+  watchWalmart()
+
   browser.runtime.onInstalled.addListener(() => {
+    void syncBridge({ inject: true })
     void browser.contextMenus.removeAll().then(() => {
       browser.contextMenus.create({
         id: "import-page",
@@ -134,6 +146,23 @@ export default defineBackground(() => {
   })
 
   browser.runtime.onMessage.addListener((message, sender, respond) => {
+    // From a Merran page, through the bridge: for the Merran the browser
+    // says the page is on, which the background checks is connected.
+    if (message?.type === "bridge" && typeof message.command === "string") {
+      const tab = sender.tab
+      if (sender.id !== browser.runtime.id || !tab || !sender.url) return
+      const origin = new URL(sender.url).origin
+      void answerPage(
+        message.command,
+        message.args ?? {},
+        origin,
+        tab.id === undefined
+          ? null
+          : { windowId: tab.windowId, index: tab.index },
+        tab.id ?? null
+      ).then(respond, () => respond({ ok: false, why: "failed" }))
+      return true
+    }
     // From the popup: add the recipe on the page in a tab.
     if (message?.type === "add-tab" && typeof message.tabId === "number") {
       void addTab(message.tabId).then(respond)

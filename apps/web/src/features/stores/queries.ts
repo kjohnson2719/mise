@@ -30,6 +30,16 @@ export const krogerBasketQuery = queryOptions({
   refetchOnWindowFocus: false,
 })
 
+/**
+ * What the list is at Walmart: the products kept and what's still to find,
+ * which Merran's browser extension looks for. Only what Merran has: cheap
+ * to ask again as the extension moves on.
+ */
+export const walmartBasketQuery = queryOptions({
+  queryKey: ["stores", "walmart", "basket"],
+  queryFn: () => unwrap(api.GET("/api/stores/walmart/basket")),
+})
+
 /** What's on sale at the household's store, and the recipes it's in. */
 export const dealsQuery = queryOptions({
   queryKey: ["stores", "deals"],

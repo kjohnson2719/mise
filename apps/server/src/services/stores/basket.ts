@@ -73,12 +73,12 @@ function amountOf(item: ShoppingItem) {
   return item.amountText ?? formatAmount(quantity, item.unit ?? null)
 }
 
-/** What's left to get on the list for Kroger: its own, else those for no store. */
-export async function itemsToGet(em: EntityManager) {
+/** What's left to get on the list for a store: its own, else those for no store. */
+export async function itemsToGet(em: EntityManager, store: string = KROGER) {
   const lists = await em.find(ShoppingList, {})
-  const forKroger = lists.filter((list) => list.store === KROGER)
+  const forStore = lists.filter((list) => list.store === store)
   const chosen =
-    forKroger.length > 0 ? forKroger : lists.filter((list) => !list.store)
+    forStore.length > 0 ? forStore : lists.filter((list) => !list.store)
   return em.find(
     ShoppingItem,
     { list: { $in: chosen.map((list) => list.id) }, checked: false },
@@ -90,14 +90,15 @@ export async function itemsToGet(em: EntityManager) {
 export async function recordPrices(
   em: EntityManager,
   householdId: string,
-  products: readonly Product[]
+  products: readonly Product[],
+  store: string = KROGER
 ) {
   if (products.length === 0) return
   const day = await householdToday(em, householdId)
   const kept = new Map(
     (
       await em.find(StorePrice, {
-        store: KROGER,
+        store,
         day,
         productId: { $in: products.map((product) => product.id) },
       })
@@ -108,7 +109,7 @@ export async function recordPrices(
       kept.get(product.id) ??
       em.create(StorePrice, {
         household: householdId,
-        store: KROGER,
+        store,
         productId: product.id,
         day,
         currency: product.currency,

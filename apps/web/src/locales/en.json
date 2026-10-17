@@ -598,6 +598,12 @@
         "remove": "Remove",
         "saved": "Kroger app saved.",
         "removed": "Kroger app removed."
+      },
+      "walmart": {
+        "title": "Walmart",
+        "description": "Experimental. Households in the US can fill their Walmart cart through Merran's browser extension, which finds each thing and adds it in a Walmart tab of the person's own, at a person's pace. Merran never reaches Walmart itself, and stops whenever Walmart asks whether it's a person.",
+        "switch": "Walmart through the extension",
+        "switchHint": "Off until you turn it on. Walmart has no way in for apps like Merran, so a change to its site can stop this working until Merran catches up."
       }
     },
     "transfer": {
@@ -1807,6 +1813,68 @@
       "barelyOff": "Barely off",
       "usually": "Usually {{price}}"
     },
+    "walmart": {
+      "title": "Walmart cart",
+      "description": "From the list. Merran's browser extension finds each thing and fills your cart in a Walmart tab of your own; you check out on Walmart's site.",
+      "experimental": "Experimental",
+      "setup": "Walmart has no way in for Merran, so the extension does it in your own browser: it finds things and fills your cart in a Walmart tab, as you would. Each step ticks itself off once it's done.",
+      "access": {
+        "title": "Let it work on walmart.com",
+        "text": "Your browser asks you once. The extension only works on Walmart when you ask from here, never sees your Walmart password or card, and stops for you whenever Walmart asks if you're a person.",
+        "button": "Allow on walmart.com"
+      },
+      "send_zero": "Add to the Walmart cart",
+      "send_one": "Add {{count}} to the Walmart cart",
+      "send_other": "Add {{count}} to the Walmart cart",
+      "toFind_one": "{{count}} thing has no product at Walmart yet",
+      "toFind_other": "{{count}} things have no product at Walmart yet",
+      "toFindHint": "The extension searches Walmart for each in a tab beside this one, and Merran picks one, which you can change.",
+      "find": "Find them at Walmart",
+      "nothingPicked": "Nothing picked at Walmart yet.",
+      "searchHint": "What Walmart had when the extension looked. For something else, search: it looks in your Walmart tab. Your pick is kept for next time.",
+      "no": {
+        "noAnswer": "The extension didn't answer. Reload this page, and check it's turned on in your browser.",
+        "busy": "The extension is busy in the Walmart tab. Wait for it, or stop it first.",
+        "access": "Let the extension work on walmart.com first.",
+        "household": "The extension isn't connected to this household.",
+        "check": "Walmart wants to check you're a person. Finish that in the Walmart tab, then carry on.",
+        "failed": "That didn't work. Try again.",
+        "searchCheck": "Walmart wants to check you're a person. Finish that in the Walmart tab, then search again.",
+        "searchSetup": "Searching Walmart needs Merran's browser extension: set it up above, then search again."
+      },
+      "job": {
+        "starting": "Opening Walmart…",
+        "finding": "Looking for {{name}} at Walmart",
+        "adding": "Adding {{name}} to your cart",
+        "progress": "{{done}} of {{total}}",
+        "beside": "In the Walmart tab, which comes back here when it's done. The extension's button counts down what's left.",
+        "showTab": "Show the Walmart tab",
+        "stop": "Stop",
+        "stopping": "Stopping after this one…",
+        "checkTitle": "Walmart wants to check you're a person",
+        "checkText": "Finish that in the Walmart tab (it's usually press and hold): it carries on by itself once you're through. Merran never does it for you.",
+        "carryOn": "Carry on",
+        "stoppedTitle": "Stopped part way",
+        "stoppedText": "{{done}} of {{total}} done. Carry on from where it stopped.",
+        "failedTitle": "That didn't work",
+        "dismiss": "Done",
+        "found_one": "Found {{count}} thing at Walmart",
+        "found_other": "Found {{count}} things at Walmart",
+        "foundText": "Merran picked one for each. Look them over, change any, then add them to the cart.",
+        "filled_one": "Added {{count}} thing to your Walmart cart",
+        "filled_other": "Added {{count}} things to your Walmart cart",
+        "filledText": "Check out on Walmart's site: that's always yours.",
+        "packages": "×{{count}}",
+        "skipped": "Left out",
+        "why": {
+          "out_of_stock": "Out of stock at Walmart",
+          "not_found": "Walmart found nothing",
+          "no_product": "Nothing picked yet",
+          "not_added": "Walmart's page didn't add it"
+        },
+        "openCart": "Open your Walmart cart"
+      }
+    },
     "deals": {
       "onSale": "On sale: {{foods}}",
       "lowestOn": "Lowest in a while: {{foods}}"
@@ -2529,6 +2597,32 @@
     "toMerran": "Go to Merran",
     "toKeys": "API keys",
     "which": "Which household should the Merran extension work with?",
-    "whichHint": "To work with more than one, connect again from the extension for each: it keeps them all, to switch between."
+    "whichHint": "To work with more than one, connect again from the extension for each: it keeps them all, to switch between.",
+    "setup": {
+      "title": "Set up Merran's browser extension",
+      "looking": "Looking for the extension…",
+      "done": "(done)",
+      "get": {
+        "title": "Get the extension",
+        "text": "For Chrome, Edge or Firefox: the zip for your browser, from Merran's releases.",
+        "button": "Download",
+        "how": "How to install it",
+        "chrome": "Chrome or Edge: unzip it, open chrome://extensions (edge://extensions in Edge), turn on Developer mode, choose Load unpacked, and pick the unzipped folder.",
+        "firefox": "Firefox: open about:debugging, choose This Firefox, then Load Temporary Add-on, and pick manifest.json in the unzipped folder. Firefox forgets it when it restarts, until it's in Firefox's add-ons."
+      },
+      "connect": {
+        "title": "Connect it to this Merran",
+        "text": "Click the Merran button in your browser's toolbar (it may be under the puzzle piece) and enter this address. Merran opens to ask you, then this ticks itself off.",
+        "address": "This Merran's address",
+        "other": "It's connected to {{households}}, not {{household}}. Click its button in the toolbar, then Add a household."
+      },
+      "stuck": {
+        "title": "Done that, and it's not ticking off?",
+        "browser": "Open Merran in the browser the extension is in: it only hears Merran's pages in its own browser, not in another browser or app.",
+        "reload": "Just installed or updated it? Reload it on your browser's extensions page (chrome://extensions, or edge://extensions in Edge), then reload this page.",
+        "address": "Its toolbar button shows the address it's connected to: it has to be {{address}} exactly. localhost and 127.0.0.1 count as different addresses, as does another Merran; enter this one to connect it here too.",
+        "on": "Check it's turned on, and allowed on this site, in your browser's extensions page."
+      }
+    }
   }
 }

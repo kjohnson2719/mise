@@ -46,6 +46,13 @@ body {
   padding: 16px;
 }
 
+/* A page of the extension's own, in a tab. */
+.page {
+  max-width: 520px;
+  margin: 0 auto;
+  padding: 48px 16px;
+}
+
 .panel {
   min-height: 100vh;
   padding: 16px;

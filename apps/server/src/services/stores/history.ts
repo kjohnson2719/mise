@@ -19,7 +19,8 @@ const HISTORY_DAYS = 90
 export async function priceHistory(
   em: EntityManager,
   productIds: readonly string[],
-  today: string
+  today: string,
+  store: string = KROGER
 ) {
   const ids = [...new Set(productIds)]
   const history = new Map<string, PriceSeen[]>()
@@ -27,7 +28,7 @@ export async function priceHistory(
   const rows = await em.find(
     StorePrice,
     {
-      store: KROGER,
+      store,
       productId: { $in: ids },
       day: { $gte: addDays(today, -HISTORY_DAYS) },
     },
@@ -50,12 +51,14 @@ export async function priceHistory(
 export async function judgeSales(
   em: EntityManager,
   products: readonly Product[],
-  today: string
+  today: string,
+  store: string = KROGER
 ) {
   const history = await priceHistory(
     em,
     products.map((product) => product.id),
-    today
+    today,
+    store
   )
   const judged = new Map<string, SaleJudged>()
   for (const product of products) {

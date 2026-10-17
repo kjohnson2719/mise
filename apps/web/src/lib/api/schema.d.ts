@@ -3412,6 +3412,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/stores/walmart/basket": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The Walmart cart to look over
+         * @description Experimental, when the server admin has turned Walmart on. Each thing left on the list for Walmart (or, with no list for it, the lists for any store) with its product, the household's own pick or Merran's, how many and what it cost when last seen; and what's still to find at Walmart, which Merran's browser extension looks for in the person's own Walmart tab. Merran never reaches Walmart itself. With an API key, it needs the `list: read` permission.
+         */
+        get: operations["getWalmartBasket"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stores/walmart/found": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * What the extension found at Walmart
+         * @description The products Merran's browser extension read from Walmart's search for things on the list. Every price is kept; each thing without a product of the household's own gets Merran's pick (the household's model for shopping when it has AI, else the first in stock), kept for its food. A product someone picked is never replaced, only brought up to date. The answer is the cart to look over. With an API key, it needs the `list: write` permission.
+         */
+        post: operations["walmartFound"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stores/walmart/products/{itemId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What Walmart had for a thing on the list
+         * @description The products Walmart's search had for its food when Merran's browser extension last looked, to pick another from without looking again. Empty if it hasn't looked yet. With an API key, it needs the `list: read` permission.
+         */
+        get: operations["walmartOptions"];
+        /**
+         * Buy this at Walmart for a thing on the list
+         * @description A product someone picked from Walmart, as the extension read it: kept for the thing's food from now on, and never replaced by Merran's picks. With an API key, it needs the `list: write` permission.
+         */
+        put: operations["pickWalmartProduct"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/stores/walmart/sent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * What the extension put in the Walmart cart
+         * @description Remembered as sent while it's still on the list, so it's left unticked next time, and its product kept as the household's, as its page showed it. The extension adds to the cart in the person's own Walmart tab; this only records it. With an API key, it needs the `list: write` permission.
+         */
+        post: operations["walmartSent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/telemetry/install-id": {
         parameters: {
             query?: never;
@@ -10100,6 +10184,257 @@ export interface components {
             searched: number;
             /** @description Foods in its recipes that are a deal now. */
             deals: number;
+        };
+        /**
+         * @example {
+         *       "store": "Walmart",
+         *       "cartUrl": "https://www.walmart.com/cart",
+         *       "sentAt": null,
+         *       "lines": [
+         *         {
+         *           "itemId": "0199e8b0-5a10-7a01-8b00-00000000001d",
+         *           "name": "milk",
+         *           "amount": "1 gallon",
+         *           "product": {
+         *             "id": "10450114",
+         *             "upc": null,
+         *             "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+         *             "brand": "Great Value",
+         *             "size": "128 fl oz",
+         *             "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+         *             "price": 327,
+         *             "salePrice": null,
+         *             "saleEnds": null,
+         *             "currency": "USD",
+         *             "aisle": null,
+         *             "inStock": true,
+         *             "url": "https://www.walmart.com/ip/10450114"
+         *           },
+         *           "suggested": true,
+         *           "packages": 1,
+         *           "sure": true,
+         *           "sent": false,
+         *           "sale": null
+         *         },
+         *         {
+         *           "itemId": "0199e8b0-5a10-7a01-8b00-00000000001e",
+         *           "name": "eggs",
+         *           "amount": "12",
+         *           "product": null,
+         *           "suggested": true,
+         *           "packages": 1,
+         *           "sure": true,
+         *           "sent": false,
+         *           "sale": null
+         *         }
+         *       ],
+         *       "toFind": [
+         *         {
+         *           "itemId": "0199e8b0-5a10-7a01-8b00-00000000001e",
+         *           "words": "eggs"
+         *         }
+         *       ]
+         *     }
+         */
+        WalmartBasket: {
+            /** @description Walmart. */
+            store: string;
+            /** @description Walmart's cart, to check out. */
+            cartUrl: string;
+            /** Format: date-time */
+            sentAt: string | null;
+            lines: components["schemas"]["BasketLine"][];
+            /** @description Things without a product yet, one for each food, for the extension to look for at Walmart. */
+            toFind: {
+                itemId: string;
+                /** @description What to search Walmart for: the food as it's bought. */
+                words: string;
+            }[];
+        };
+        /**
+         * @example {
+         *       "items": [
+         *         {
+         *           "itemId": "0199e8b0-5a10-7a01-8b00-00000000001e",
+         *           "products": [
+         *             {
+         *               "id": "10450114",
+         *               "upc": null,
+         *               "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+         *               "brand": "Great Value",
+         *               "size": "128 fl oz",
+         *               "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+         *               "price": 327,
+         *               "salePrice": null,
+         *               "saleEnds": null,
+         *               "currency": "USD",
+         *               "aisle": null,
+         *               "inStock": true,
+         *               "url": "https://www.walmart.com/ip/10450114"
+         *             }
+         *           ]
+         *         }
+         *       ]
+         *     }
+         */
+        WalmartFound: {
+            items: {
+                itemId: string;
+                products: components["schemas"]["WalmartProduct"][];
+            }[];
+        };
+        /**
+         * @example {
+         *       "id": "10450114",
+         *       "upc": null,
+         *       "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+         *       "brand": "Great Value",
+         *       "size": "128 fl oz",
+         *       "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+         *       "price": 327,
+         *       "salePrice": null,
+         *       "saleEnds": null,
+         *       "currency": "USD",
+         *       "aisle": null,
+         *       "inStock": true,
+         *       "url": "https://www.walmart.com/ip/10450114"
+         *     }
+         */
+        WalmartProduct: {
+            id: string;
+            upc: string | null;
+            name: string;
+            brand: string | null;
+            size: string | null;
+            image: string | null;
+            price: number | null;
+            salePrice: number | null;
+            /**
+             * Format: date
+             * @description Walmart's pages don't say, so the extension sends null.
+             */
+            saleEnds: string | null;
+            /** @enum {string} */
+            currency: "USD";
+            aisle: string | null;
+            inStock: boolean;
+            url: string | null;
+        };
+        /**
+         * @example {
+         *       "products": [
+         *         {
+         *           "id": "10450114",
+         *           "upc": null,
+         *           "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+         *           "brand": "Great Value",
+         *           "size": "128 fl oz",
+         *           "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+         *           "price": 327,
+         *           "salePrice": null,
+         *           "saleEnds": null,
+         *           "currency": "USD",
+         *           "aisle": null,
+         *           "inStock": true,
+         *           "url": "https://www.walmart.com/ip/10450114"
+         *         }
+         *       ]
+         *     }
+         */
+        WalmartOptions: {
+            /** @description What Walmart's search had for it when the extension last looked, Walmart's order with ads and what's out of stock last. Empty if it hasn't looked. */
+            products: components["schemas"]["StoreProduct"][];
+        };
+        /**
+         * @example {
+         *       "product": {
+         *         "id": "10450114",
+         *         "upc": null,
+         *         "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+         *         "brand": "Great Value",
+         *         "size": "128 fl oz",
+         *         "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+         *         "price": 327,
+         *         "salePrice": null,
+         *         "saleEnds": null,
+         *         "currency": "USD",
+         *         "aisle": null,
+         *         "inStock": true,
+         *         "url": "https://www.walmart.com/ip/10450114"
+         *       }
+         *     }
+         */
+        WalmartPick: {
+            product: components["schemas"]["WalmartProduct"];
+        };
+        /**
+         * @example {
+         *       "lines": [
+         *         {
+         *           "itemId": "0199e8b0-5a10-7a01-8b00-00000000001d",
+         *           "packages": 1,
+         *           "product": {
+         *             "id": "10450114",
+         *             "upc": null,
+         *             "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+         *             "brand": "Great Value",
+         *             "size": "128 fl oz",
+         *             "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+         *             "price": 327,
+         *             "salePrice": null,
+         *             "saleEnds": null,
+         *             "currency": "USD",
+         *             "aisle": null,
+         *             "inStock": true,
+         *             "url": "https://www.walmart.com/ip/10450114"
+         *           }
+         *         }
+         *       ]
+         *     }
+         */
+        WalmartSent: {
+            lines: {
+                itemId: string;
+                packages: number;
+                /**
+                 * @description The product as its page showed it when it was added.
+                 * @example {
+                 *       "id": "10450114",
+                 *       "upc": null,
+                 *       "name": "Great Value 2% Reduced Fat Milk, Gallon, 128 fl oz",
+                 *       "brand": "Great Value",
+                 *       "size": "128 fl oz",
+                 *       "image": "https://i5.walmartimages.com/seo/milk.jpeg",
+                 *       "price": 327,
+                 *       "salePrice": null,
+                 *       "saleEnds": null,
+                 *       "currency": "USD",
+                 *       "aisle": null,
+                 *       "inStock": true,
+                 *       "url": "https://www.walmart.com/ip/10450114"
+                 *     }
+                 */
+                product?: {
+                    id: string;
+                    upc: string | null;
+                    name: string;
+                    brand: string | null;
+                    size: string | null;
+                    image: string | null;
+                    price: number | null;
+                    salePrice: number | null;
+                    /**
+                     * Format: date
+                     * @description Walmart's pages don't say, so the extension sends null.
+                     */
+                    saleEnds: string | null;
+                    /** @enum {string} */
+                    currency: "USD";
+                    aisle: string | null;
+                    inStock: boolean;
+                    url: string | null;
+                } | null;
+            }[];
         };
         /**
          * @example {
@@ -20271,6 +20606,275 @@ export interface operations {
             };
             /** @description Kroger didn't answer. */
             502: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    getWalmartBasket: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The cart to look over. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalmartBasket"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Walmart isn't turned on on this server. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    walmartFound: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WalmartFound"];
+            };
+        };
+        responses: {
+            /** @description Picked, and the cart as it is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalmartBasket"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Walmart isn't turned on on this server. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    walmartOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description What Walmart had. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WalmartOptions"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not on the list. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Walmart isn't turned on on this server. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    pickWalmartProduct: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                itemId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WalmartPick"];
+            };
+        };
+        responses: {
+            /** @description Kept, and the line as it is. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BasketLine"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not on the list. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Walmart isn't turned on on this server. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    walmartSent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WalmartSent"];
+            };
+        };
+        responses: {
+            /** @description Remembered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SentBasket"];
+                };
+            };
+            /** @description Not signed in. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not allowed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Walmart isn't turned on on this server. */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -113,6 +113,7 @@ export function ListPage() {
 
   const { data: household } = useQuery(householdQuery)
   const kroger = useCapability("stores.kroger")
+  const walmart = useCapability("stores.walmart")
   const { data: stores } = useQuery({ ...storesQuery, enabled: kroger })
   /** Where to find something on its list's store's site, if it has one. */
   const findAt = (item: ListItem) => {
@@ -179,6 +180,14 @@ export function ListPage() {
     toGet.length > 0 &&
     (current?.store === "kroger" ||
       (!lists.some((option) => option.store === "kroger") && !current?.store))
+  // Walmart through the extension (experimental, when the server has it on),
+  // on walmart.com: the Walmart list, or the lists for no store in particular.
+  const toWalmart =
+    walmart &&
+    toGet.length > 0 &&
+    (household?.country ?? "US") === "US" &&
+    (current?.store === "walmart" ||
+      (!lists.some((option) => option.store === "walmart") && !current?.store))
   /** The list showing, when there's more than one. */
   const listShowing = split ? current?.id : undefined
 
@@ -227,6 +236,16 @@ export function ListPage() {
                     data-icon="inline-start"
                   />
                   {t("list.sendTo", { store: krogerStore })}
+                </Button>
+              )}
+              {toWalmart && (
+                <Button variant="outline" render={<Link to="/list/walmart" />}>
+                  <HugeiconsIcon
+                    icon={ShoppingCart01Icon}
+                    strokeWidth={2}
+                    data-icon="inline-start"
+                  />
+                  {t("list.sendTo", { store: "Walmart" })}
                 </Button>
               )}
               <Button onClick={() => setFromPlan(true)}>

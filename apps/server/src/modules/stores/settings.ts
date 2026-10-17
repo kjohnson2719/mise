@@ -4,6 +4,7 @@ import {
   choiceSetting,
   numberSetting,
   secretSetting,
+  switchSetting,
   textSetting,
 } from "../../core/settings.ts"
 
@@ -18,6 +19,13 @@ export const STORE_SETTINGS = {
     key: "stores.krogerClientSecret",
     env: "MERRAN_KROGER_CLIENT_SECRET",
     description: "Your Kroger developer app's client secret.",
+  }),
+  walmart: switchSetting({
+    key: "stores.walmart",
+    env: "MERRAN_WALMART",
+    description:
+      "Experimental: Walmart through Merran's browser extension, in each person's own Walmart tab. It finds each thing on the list, Merran picks a product, and it fills their Walmart cart. It stops at Walmart's check that it's a person and asks them, and it may need fixing whenever Walmart changes its site.",
+    default: false,
   }),
   leanOnSales: choiceSetting({
     key: "stores.leanOnSales",

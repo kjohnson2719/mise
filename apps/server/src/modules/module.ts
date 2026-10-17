@@ -31,8 +31,12 @@ export type Module = {
   id: string
   settings: readonly AnySetting[]
   status(ctx: ModuleContext): Promise<ModuleStatus>
-  /** What the web app may offer while it's on, like "ai.chat". */
-  capabilities?: readonly string[]
+  /**
+   * What the web app may offer while it's on, like "ai.chat": a list, or
+   * worked out from its settings when parts of it can be on alone.
+   */
+  capabilities?:
+    readonly string[] | ((ctx: ModuleContext) => Promise<readonly string[]>)
   /**
    * What the web app needs while it's on, like where to send its errors.
    * Anyone can read this, before signing in too, so never a secret.
@@ -66,8 +70,14 @@ export async function describeModules(
   const described = await Promise.all(
     modules.map(async (module) => {
       const status = await module.status(ctx)
+      const capabilities = !status.on
+        ? []
+        : typeof module.capabilities === "function"
+          ? await module.capabilities(ctx)
+          : (module.capabilities ?? [])
       return {
         module,
+        capabilities,
         state: status.on
           ? { id: module.id, on: true }
           : { id: module.id, on: false, needs: status.needs },
@@ -78,9 +88,7 @@ export async function describeModules(
   )
   return {
     modules: described.map(({ state }) => state),
-    capabilities: described.flatMap(({ module, state }) =>
-      state.on ? [...(module.capabilities ?? [])] : []
-    ),
+    capabilities: described.flatMap(({ capabilities }) => [...capabilities]),
     client: Object.fromEntries(
       described.flatMap(({ module, client }) =>
         client ? [[module.id, client]] : []

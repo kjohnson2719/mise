@@ -146,7 +146,7 @@ Keep this page current: when a feature is built, changed, planned or dropped, up
 | Costco and any store with a search page | Detail | Built | Find each thing on a store's list on its site, in the app and the extension; stores by country |
 | Buying by the package: the rest of a 2 lb pack goes in the pantry | Key | Built | Module (stores): what was sent to the Kroger cart is put away as the packs bought, with the meals' share set aside and the rest there to use |
 | Every food known by any of its names: brands, regional names (plain flour, coriander leaves), kinds of (a green bell pepper is a bell pepper), a household's own "same as" | Key | Built | [foods.md](foods.md); one vocabulary for recipes, the list, the pantry, nutrition and the stores; 705 foods so far, with what a cup and one of each weighs, how each keeps, what the store calls it and (for 625) its USDA food; a kind covers its food at home (green bell peppers for a bell pepper); Same as and Not the same on the list |
-| Fill a Walmart cart through the extension | Detail | Planned | Experimental, off by default |
+| Fill a Walmart cart through the extension | Detail | Built | Module (stores), experimental and off until the server admin turns it on: Send to Walmart on the list; the extension finds each thing and fills the cart in a Walmart tab of the person's own, Merran picks a product for each and keeps every price and what Walmart had, so Change offers other brands and sizes at once; it stops at Walmart's check that it's a person for them to finish, and carries on by itself after; a setup card for the extension that ticks itself off |
 | Barcode scanning | Detail | Later | |
 
 ## The assistant and AI

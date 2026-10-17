@@ -20,6 +20,12 @@ export const StoreProduct = defineEntity({
     product: p.json<Product>(),
     /** A person picked it, or it was sent to the cart: kept as it is. */
     chosen: p.boolean().default(false),
+    /**
+     * What the store had for the food when it was last looked for, to pick
+     * another from without looking again: Walmart's search, as the browser
+     * extension read it.
+     */
+    options: p.json<Product[]>().nullable(),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },

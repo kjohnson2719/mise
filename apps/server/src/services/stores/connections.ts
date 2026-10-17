@@ -40,11 +40,15 @@ export async function needKrogerApp(deps: StoreDeps): Promise<KrogerApp> {
   return app
 }
 
-/** The household's Kroger connection, made when first needed. */
-async function connectionOf(em: EntityManager, householdId: string) {
+/** The household's connection to a store, made when first needed. */
+export async function connectionOf(
+  em: EntityManager,
+  householdId: string,
+  store: string = KROGER
+) {
   return (
-    (await em.findOne(StoreConnection, { store: KROGER })) ??
-    em.create(StoreConnection, { household: householdId, store: KROGER })
+    (await em.findOne(StoreConnection, { store })) ??
+    em.create(StoreConnection, { household: householdId, store })
   )
 }
 
